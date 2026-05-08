@@ -20,7 +20,13 @@ public class PackDefinitionService {
         List<PackDefinition> supportedDefinitions = List.of(
                 barebonesPlayBooster("blb", "Bloomburrow"),
                 barebonesPlayBooster("fdn", "Foundations"),
-                barebonesPlayBooster("mkm", "Murders at Karlov Manor")
+                barebonesPlayBooster("mkm", "Murders at Karlov Manor"),
+                barebonesPlayBooster("dsk", "Duskmourn: House of Horror"),
+                barebonesPlayBooster("otj", "Outlaws of Thunder Junction"),
+                barebonesPlayBooster("lci", "The Lost Caverns of Ixalan"),
+                barebonesPlayBooster("woe", "Wilds of Eldraine"),
+                barebonesPlayBooster("mom", "March of the Machine"),
+                barebonesPlayBooster("one", "Phyrexia: All Will Be One")
         );
 
         this.definitions = supportedDefinitions.stream()

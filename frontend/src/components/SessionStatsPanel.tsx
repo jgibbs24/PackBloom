@@ -1,4 +1,5 @@
 import type { SessionStats } from '../types/pack';
+import { AnimatedCurrency } from './AnimatedCurrency';
 
 type SessionStatsPanelProps = {
   stats: SessionStats;
@@ -19,21 +20,27 @@ export function SessionStatsPanel({ stats }: SessionStatsPanelProps) {
         </div>
         <div className="rounded-md bg-white/[0.04] p-3">
           <dt className="text-stone-400">Total value</dt>
-          <dd className="mt-1 font-semibold text-white">${stats.totalEstimatedValue.toFixed(2)}</dd>
+          <dd className="mt-1 font-semibold text-white">
+            <AnimatedCurrency value={stats.totalEstimatedValue} />
+          </dd>
         </div>
         <div className="rounded-md bg-white/[0.04] p-3">
           <dt className="text-stone-400">Net profit/loss</dt>
           <dd className={`mt-1 font-semibold ${isProfitable ? 'text-emerald-300' : 'text-red-300'}`}>
-            {netPrefix}${netValue.toFixed(2)}
+            <AnimatedCurrency prefix={`${netPrefix}$`} value={netValue} />
           </dd>
         </div>
         <div className="rounded-md bg-white/[0.04] p-3">
           <dt className="text-stone-400">Average pack</dt>
-          <dd className="mt-1 font-semibold text-white">${stats.averagePackValue.toFixed(2)}</dd>
+          <dd className="mt-1 font-semibold text-white">
+            <AnimatedCurrency value={stats.averagePackValue} />
+          </dd>
         </div>
         <div className="rounded-md bg-white/[0.04] p-3">
           <dt className="text-stone-400">Best pack</dt>
-          <dd className="mt-1 font-semibold text-white">${stats.bestPackValue.toFixed(2)}</dd>
+          <dd className="mt-1 font-semibold text-white">
+            <AnimatedCurrency value={stats.bestPackValue} />
+          </dd>
         </div>
         <div className="rounded-md bg-white/[0.04] p-3">
           <dt className="text-stone-400">Mythics</dt>

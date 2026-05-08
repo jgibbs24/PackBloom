@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchSupportedSets, openPack } from '../api/packApi';
 import type { CardDto, OpenedPackDto, SessionStats, SupportedSetDto } from '../types/pack';
+import { BinderPage } from './BinderPage';
 import { CardGrid } from './CardGrid';
 import { CardPreviewModal } from './CardPreviewModal';
 import { CardRevealStack } from './CardRevealStack';
@@ -12,6 +13,7 @@ const DEFAULT_SET_CODE = 'blb';
 const PACK_MSRP_USD = 5.99;
 type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
+type ActiveView = 'opener' | 'binder';
 
 const initialSessionStats: SessionStats = {
   packsOpened: 0,
@@ -38,6 +40,8 @@ export function PackOpener() {
   const [selectedCard, setSelectedCard] = useState<CardDto | null>(null);
   const [hasCountedCurrentPack, setHasCountedCurrentPack] = useState(false);
   const [summaryPack, setSummaryPack] = useState<OpenedPackDto | null>(null);
+  const [activeView, setActiveView] = useState<ActiveView>('opener');
+  const [binderCards, setBinderCards] = useState<CardDto[]>([]);
 
   useEffect(() => {
     let ignore = false;
@@ -88,6 +92,7 @@ export function PackOpener() {
       if (revealMode === 'all') {
         setSummaryPack(openedPack);
         setSessionStats((currentStats) => updateSessionStats(currentStats, openedPack));
+        setBinderCards((currentCards) => updateBinderCards(currentCards, openedPack));
       }
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Unable to open pack.';
@@ -144,6 +149,7 @@ export function PackOpener() {
                     if (!hasCountedCurrentPack) {
                       setSummaryPack(pack);
                       setSessionStats((currentStats) => updateSessionStats(currentStats, pack));
+                      setBinderCards((currentCards) => updateBinderCards(currentCards, pack));
                       setHasCountedCurrentPack(true);
                     }
                   }
@@ -175,6 +181,7 @@ export function PackOpener() {
                       if (!hasCountedCurrentPack) {
                         setSummaryPack(pack);
                         setSessionStats((currentStats) => updateSessionStats(currentStats, pack));
+                        setBinderCards((currentCards) => updateBinderCards(currentCards, pack));
                         setHasCountedCurrentPack(true);
                       }
                       return;
@@ -197,7 +204,26 @@ export function PackOpener() {
             </div>
           )}
 
-          {pack ? (
+          <div className="mb-5 flex gap-3">
+            <button
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${activeView === 'opener' ? 'bg-ember text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
+              onClick={() => setActiveView('opener')}
+              type="button"
+            >
+              Pack opener
+            </button>
+            <button
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${activeView === 'binder' ? 'bg-ember text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
+              onClick={() => setActiveView('binder')}
+              type="button"
+            >
+              Binder
+            </button>
+          </div>
+
+          {activeView === 'binder' ? (
+            <BinderPage cards={binderCards} onSelectCard={setSelectedCard} />
+          ) : pack ? (
             isCinematicReveal ? (
               <CardRevealStack cards={displayedCards} onSelectCard={setSelectedCard} />
             ) : pack.cards.length > 0 ? (
@@ -256,4 +282,19 @@ function findBestCard(cards: CardDto[]): CardDto | null {
     }
     return best;
   }, null);
+}
+
+function updateBinderCards(currentCards: CardDto[], pack: OpenedPackDto): CardDto[] {
+  const cardsById = new Map(currentCards.map((card) => [card.id, card]));
+
+  for (const card of pack.cards) {
+    const existingCard = cardsById.get(card.id);
+    if (!existingCard || card.priceUsd > existingCard.priceUsd) {
+      cardsById.set(card.id, card);
+    }
+  }
+
+  return Array.from(cardsById.values())
+    .sort((left, right) => right.priceUsd - left.priceUsd)
+    .slice(0, 20);
 }

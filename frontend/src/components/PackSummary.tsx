@@ -1,4 +1,5 @@
 import type { OpenedPackDto } from '../types/pack';
+import { AnimatedCurrency } from './AnimatedCurrency';
 
 type PackSummaryProps = {
   pack: OpenedPackDto | null;
@@ -16,7 +17,7 @@ export function PackSummary({ pack, isLoading, selectedSetCode }: PackSummaryPro
       <div className="mt-5 rounded-md border border-white/10 bg-white/[0.04] p-4">
         <p className="text-sm text-stone-400">Pack value</p>
         <p className="mt-1 text-4xl font-bold text-white">
-          {pack ? `$${pack.totalValueUsd.toFixed(2)}` : isLoading ? '...' : '$0.00'}
+          {pack ? <AnimatedCurrency value={pack.totalValueUsd} /> : isLoading ? '...' : '$0.00'}
         </p>
       </div>
 
