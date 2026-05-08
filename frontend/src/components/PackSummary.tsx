@@ -14,7 +14,7 @@ export function PackSummary({ pack, isLoading, selectedSetCode }: PackSummaryPro
     <aside className="rounded-lg border border-ember/20 bg-stone-950/80 p-5 shadow-card lg:sticky lg:top-8">
       <p className="text-sm font-semibold uppercase tracking-[0.22em] text-ember">Pack summary</p>
       <div className="mt-5 rounded-md border border-white/10 bg-white/[0.04] p-4">
-        <p className="text-sm text-stone-400">Total value</p>
+        <p className="text-sm text-stone-400">Pack value</p>
         <p className="mt-1 text-4xl font-bold text-white">
           {pack ? `$${pack.totalValueUsd.toFixed(2)}` : isLoading ? '...' : '$0.00'}
         </p>

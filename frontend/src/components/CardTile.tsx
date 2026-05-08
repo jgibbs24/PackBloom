@@ -2,6 +2,7 @@ import type { CardDto } from '../types/pack';
 
 type CardTileProps = {
   card: CardDto;
+  onSelect: (card: CardDto) => void;
 };
 
 const rarityStyles: Record<string, string> = {
@@ -11,9 +12,21 @@ const rarityStyles: Record<string, string> = {
   mythic: 'text-orange-300',
 };
 
-export function CardTile({ card }: CardTileProps) {
+const rarityBorderStyles: Record<string, string> = {
+  common: 'hover:border-stone-600',
+  uncommon: 'hover:border-slate-100 hover:shadow-[0_0_24px_rgba(226,232,240,0.22)]',
+  rare: 'hover:border-yellow-300 hover:shadow-[0_0_26px_rgba(253,224,71,0.34)]',
+  mythic: 'hover:border-orange-300 hover:shadow-[0_0_30px_rgba(251,146,60,0.42)]',
+};
+
+export function CardTile({ card, onSelect }: CardTileProps) {
   return (
-    <article className="group overflow-hidden rounded-lg border border-white/10 bg-stone-950/70 shadow-card transition duration-200 hover:-translate-y-1 hover:border-ember/60">
+    <button
+      aria-label={`View ${card.name}`}
+      className={`group overflow-hidden rounded-lg border border-white/10 bg-stone-950/70 text-left shadow-card transition duration-200 hover:-translate-y-1 focus:border-ember focus:outline-none ${rarityBorderStyles[card.rarity] ?? 'hover:border-stone-600'}`}
+      onClick={() => onSelect(card)}
+      type="button"
+    >
       <div className="aspect-[488/680] overflow-hidden bg-stone-900">
         <img
           alt={card.name}
@@ -33,6 +46,6 @@ export function CardTile({ card }: CardTileProps) {
           </span>
         </div>
       </div>
-    </article>
+    </button>
   );
 }
