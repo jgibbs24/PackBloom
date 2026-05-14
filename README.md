@@ -320,16 +320,18 @@ All currently use the same temporary barebones play-booster composition.
 - Session stats are frontend state only and reset on refresh.
 - No database yet.
 - No user accounts yet.
-- Deployment hosts have not been selected yet.
+- Deployment config targets Vercel for the frontend and Render for the backend.
 
 ## Deployment Notes
 
 The frontend and backend can be deployed separately.
 
-- Frontend candidates: Vercel, Netlify, or another static Vite host.
-- Backend candidates: Render, Railway, Fly.io, or another Java/Spring Boot host.
-- Set `VITE_API_BASE_URL` in the frontend host to the deployed backend origin.
-- Set `app.cors.allowed-origins` in the backend environment to the deployed frontend origin.
+- Frontend target: Vercel.
+- Backend target: Render.
+- Set the Vercel root directory to `frontend`.
+- Set `VITE_API_BASE_URL` in Vercel to the deployed Render backend origin.
+- Render uses `render.yaml` and `backend/Dockerfile` to build the Spring Boot API on Java 21.
+- Set `APP_CORS_ALLOWED_ORIGINS` in Render to the deployed Vercel frontend origin.
 - Keep local origins for local development only:
   - `http://localhost:5173`
   - `http://127.0.0.1:5173`
@@ -344,6 +346,69 @@ If a host exposes environment variables instead of property files, Spring Boot c
 
 ```text
 APP_CORS_ALLOWED_ORIGINS=https://your-frontend.example.com
+```
+
+### Vercel Frontend
+
+Recommended settings:
+
+```text
+Root Directory: frontend
+Install Command: npm install
+Build Command: npm run build
+Output Directory: dist
+```
+
+Environment variable:
+
+```text
+VITE_API_BASE_URL=https://your-render-backend.onrender.com
+```
+
+### Render Backend
+
+Recommended settings:
+
+```text
+Blueprint: render.yaml
+Runtime: Docker
+Root Directory: backend
+Dockerfile: backend/Dockerfile
+Plan: Free for portfolio/demo use
+```
+
+Environment variable:
+
+```text
+APP_CORS_ALLOWED_ORIGINS=https://your-vercel-frontend.vercel.app
+```
+
+Render's free web services can cold start after inactivity. That is acceptable for a portfolio/demo app, but upgrade the plan if you want consistently fast first requests.
+
+### Asset Optimization
+
+Original PNG pack wrapper uploads live in:
+
+```text
+frontend/src/assets/pack-wrappers/
+```
+
+The app imports optimized WebP versions from:
+
+```text
+frontend/src/assets/pack-wrappers/optimized/
+```
+
+Regenerate optimized wrapper images after adding or replacing source PNGs:
+
+```powershell
+cd "C:\Users\your_name\Documents\MTG-Pack-Simulator\frontend"
+npm.cmd run optimize:wrappers
+```
+
+```bash
+cd ~/Documents/MTG-Pack-Simulator/frontend
+npm run optimize:wrappers
 ```
 
 ## Disclaimer

@@ -1,23 +1,23 @@
 import type { BoosterType } from './packLabels';
 
-import blbCollector from './assets/pack-wrappers/MTGBLB_EN_Bstr_Clctr_01_01.png';
-import blbPlay from './assets/pack-wrappers/MTGBLB_EN_Bstr_Play_01_01.png';
-import dskCollector from './assets/pack-wrappers/MTGDSK_EN_Bstr_Clctr_01_02.png';
-import dskPlay from './assets/pack-wrappers/MTGDSK_EN_Bstr_Play_01_02.png';
-import fdnCollector from './assets/pack-wrappers/MTGFND_EN_Bstr_Clctr_01_02.png';
-import fdnPlay from './assets/pack-wrappers/MTGFND_EN_Bstr_Play_01_02.png';
-import lciCollector from './assets/pack-wrappers/MTGLCI_EN_ClctrBstr_01_02.png';
-import lciPlay from './assets/pack-wrappers/MTGLCI_EN_Bstr_Set_01_02.png';
-import mkmCollector from './assets/pack-wrappers/MTGMKM_EN_ClctrBstr_01_02.png';
-import mkmPlay from './assets/pack-wrappers/MTGMKM_EN_Bstr_Play_01_02.png';
-import momCollector from './assets/pack-wrappers/MTG_MOM_EN_Bstr_Clctr_01_02.png';
-import momPlay from './assets/pack-wrappers/MTGMOM_EN_Bstr_Set_01_02.png';
-import oneCollector from './assets/pack-wrappers/MTGONE_EN_ClctrBstr_01_02.png';
-import onePlay from './assets/pack-wrappers/MTGONE_EN_Bstr_Set_01_02.png';
-import otjCollector from './assets/pack-wrappers/MTGOTJ_EN_ClctrBstr_1_2.png';
-import otjPlay from './assets/pack-wrappers/MTGOTJ_EN_Bstr_Play_1_2.png';
-import woeCollector from './assets/pack-wrappers/MTGWOE_EN_ClctrBstr_01_02.png';
-import woePlay from './assets/pack-wrappers/MTGWOE_EN_Bstr_Set_01_02.png';
+import blbCollector from './assets/pack-wrappers/optimized/MTGBLB_EN_Bstr_Clctr_01_01.webp';
+import blbPlay from './assets/pack-wrappers/optimized/MTGBLB_EN_Bstr_Play_01_01.webp';
+import dskCollector from './assets/pack-wrappers/optimized/MTGDSK_EN_Bstr_Clctr_01_02.webp';
+import dskPlay from './assets/pack-wrappers/optimized/MTGDSK_EN_Bstr_Play_01_02.webp';
+import fdnCollector from './assets/pack-wrappers/optimized/MTGFND_EN_Bstr_Clctr_01_02.webp';
+import fdnPlay from './assets/pack-wrappers/optimized/MTGFND_EN_Bstr_Play_01_02.webp';
+import lciCollector from './assets/pack-wrappers/optimized/MTGLCI_EN_ClctrBstr_01_02.webp';
+import lciPlay from './assets/pack-wrappers/optimized/MTGLCI_EN_Bstr_Set_01_02.webp';
+import mkmCollector from './assets/pack-wrappers/optimized/MTGMKM_EN_ClctrBstr_01_02.webp';
+import mkmPlay from './assets/pack-wrappers/optimized/MTGMKM_EN_Bstr_Play_01_02.webp';
+import momCollector from './assets/pack-wrappers/optimized/MTG_MOM_EN_Bstr_Clctr_01_02.webp';
+import momPlay from './assets/pack-wrappers/optimized/MTGMOM_EN_Bstr_Set_01_02.webp';
+import oneCollector from './assets/pack-wrappers/optimized/MTGONE_EN_ClctrBstr_01_02.webp';
+import onePlay from './assets/pack-wrappers/optimized/MTGONE_EN_Bstr_Set_01_02.webp';
+import otjCollector from './assets/pack-wrappers/optimized/MTGOTJ_EN_ClctrBstr_1_2.webp';
+import otjPlay from './assets/pack-wrappers/optimized/MTGOTJ_EN_Bstr_Play_1_2.webp';
+import woeCollector from './assets/pack-wrappers/optimized/MTGWOE_EN_ClctrBstr_01_02.webp';
+import woePlay from './assets/pack-wrappers/optimized/MTGWOE_EN_Bstr_Set_01_02.webp';
 
 type PackWrapperImage = {
   cropScale?: number;
