@@ -1,4 +1,4 @@
-# MTG Pack Simulator
+# PackBloom
 
 A full-stack Magic: The Gathering pack-opening simulator. The app lets you choose a supported set, move through a small landing/set-selection/opening flow, open a simplified play-booster-style pack, reveal cards all at once or one by one, and track session stats like pack value, best pull, mythics pulled, and net profit/loss.
 
