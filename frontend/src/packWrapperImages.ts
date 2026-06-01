@@ -74,3 +74,15 @@ export function getPackWrapperImage(
 
   return packWrapperImages[setCode.toLowerCase()]?.[boosterType];
 }
+
+export function preloadPackWrapperImages() {
+  Object.values(packWrapperImages).forEach((imagesByBoosterType) => {
+    Object.values(imagesByBoosterType).forEach((image) => {
+      if (!image) {
+        return;
+      }
+      const preloadImage = new Image();
+      preloadImage.src = image.src;
+    });
+  });
+}

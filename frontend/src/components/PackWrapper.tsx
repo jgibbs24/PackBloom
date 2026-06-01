@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { formatPackType } from '../packLabels';
 import type { BoosterType } from '../packLabels';
 import { getPackWrapperImage } from '../packWrapperImages';
@@ -15,6 +16,7 @@ type PackWrapperProps = {
 
 export function PackWrapper({ boosterType = 'play', packTypeLabel, set, theme, size = 'large' }: PackWrapperProps) {
   const wrapperImage = getPackWrapperImage(set?.setCode, boosterType);
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
   const wrapperStyle = {
     '--wrapper-accent': theme.accent,
     '--wrapper-background': theme.background,
@@ -27,6 +29,10 @@ export function PackWrapper({ boosterType = 'play', packTypeLabel, set, theme, s
     ? 'h-40 w-28 rounded-lg'
     : 'h-[25rem] w-[14rem] rounded-xl';
 
+  useEffect(() => {
+    setIsImageLoaded(false);
+  }, [wrapperImage?.src]);
+
   if (wrapperImage) {
     return (
       <div
@@ -34,9 +40,15 @@ export function PackWrapper({ boosterType = 'play', packTypeLabel, set, theme, s
         className={`relative isolate overflow-hidden border border-white/15 bg-black/20 shadow-card ${sizeClass}`}
         style={wrapperStyle}
       >
+        {!isImageLoaded && (
+          <div className="absolute inset-0 animate-pulse bg-[linear-gradient(145deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02)_45%,rgba(0,0,0,0.28))]" />
+        )}
         <img
           alt=""
-          className="h-full w-full object-contain drop-shadow-2xl"
+          className={`h-full w-full object-contain drop-shadow-2xl transition-opacity duration-300 ${isImageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          decoding="async"
+          loading={size === 'large' ? 'eager' : 'lazy'}
+          onLoad={() => setIsImageLoaded(true)}
           src={wrapperImage.src}
           style={{
             objectFit: wrapperImage.fit ?? 'contain',

@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { fetchSupportedSets, openPack } from '../api/packApi';
 import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabels';
+import { preloadPackWrapperImages } from '../packWrapperImages';
 import { getSetTheme } from '../setThemes';
 import type { CardDto, OpenedPackDto, SessionStats, SupportedSetDto } from '../types/pack';
 import { BinderPage } from './BinderPage';
@@ -15,6 +16,12 @@ import { SetSelector } from './SetSelector';
 
 const DEFAULT_SET_CODE = 'blb';
 const FALLBACK_PACK_MSRP_USD = 5.99;
+const LANDING_FALLBACK_SET: SupportedSetDto = {
+  msrpUsd: FALLBACK_PACK_MSRP_USD,
+  packType: 'play-booster-barebones',
+  setCode: DEFAULT_SET_CODE,
+  setName: 'Bloomburrow',
+};
 type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
 type ActiveView = 'opener' | 'binder';
@@ -51,6 +58,10 @@ export function PackOpener() {
   const [boosterTypesBySetCode, setBoosterTypesBySetCode] = useState<Record<string, BoosterType>>({});
   const [isOpeningWrapper, setIsOpeningWrapper] = useState(false);
   const [landingSetIndex, setLandingSetIndex] = useState(0);
+
+  useEffect(() => {
+    preloadPackWrapperImages();
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -99,7 +110,7 @@ export function PackOpener() {
     () => sets.find((set) => set.setCode === selectedSetCode),
     [selectedSetCode, sets],
   );
-  const landingSet = sets.length > 0 ? sets[landingSetIndex % sets.length] : selectedSet;
+  const landingSet = sets.length > 0 ? sets[landingSetIndex % sets.length] : LANDING_FALLBACK_SET;
   const landingTheme = getSetTheme(landingSet?.setCode ?? selectedSetCode);
   const landingBooster = getBoosterOption(getBoosterTypeForSet(landingSet?.setCode, boosterTypesBySetCode));
   const selectedBoosterType = getBoosterTypeForSet(selectedSetCode, boosterTypesBySetCode);
@@ -182,6 +193,7 @@ export function PackOpener() {
   const isRevealLocked = Boolean(
     pack && revealMode === 'one-by-one' && revealPhase === 'revealing' && !hasCountedCurrentPack,
   );
+  const canStartOpeningFlow = !isLoadingSets && sets.length > 0;
 
   if (appStep === 'start') {
     return (
@@ -204,12 +216,22 @@ export function PackOpener() {
             <div className="mt-8 flex flex-wrap gap-3">
               <button
                 className="rounded-md bg-ember px-6 py-3 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-                disabled={isLoadingSets}
+                disabled={!canStartOpeningFlow}
                 onClick={() => setAppStep('select-set')}
                 type="button"
               >
-                {isLoadingSets ? 'Loading...' : 'Play'}
+                Play
               </button>
+              {isLoadingSets && (
+                <p className="self-center text-sm font-semibold text-stone-300">
+                  Waking the pack engine...
+                </p>
+              )}
+              {!isLoadingSets && error && sets.length === 0 && (
+                <p className="max-w-sm self-center text-sm font-semibold text-red-100">
+                  Could not reach the pack engine. Try refreshing in a moment.
+                </p>
+              )}
             </div>
           </div>
 
