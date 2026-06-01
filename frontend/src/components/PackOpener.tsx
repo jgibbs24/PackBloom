@@ -1,10 +1,11 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchSupportedSets, openPack, warmUpPack } from '../api/packApi';
+import { fetchApiHealth, fetchSupportedSets, openPack, warmUpPack } from '../api/packApi';
 import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabels';
 import { preloadPackWrapperImages } from '../packWrapperImages';
 import { clearPersistedSession, loadPersistedSession, savePersistedSession } from '../sessionStorage';
 import { getSetTheme } from '../setThemes';
+import { FALLBACK_SUPPORTED_SETS } from '../supportedSets';
 import type { CardDto, OpenedPackDto, PackHistoryEntry, SessionStats, SupportedSetDto } from '../types/pack';
 import { BinderPage } from './BinderPage';
 import { CardGrid } from './CardGrid';
@@ -27,6 +28,7 @@ const LANDING_FALLBACK_SET: SupportedSetDto = {
 type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
 type ActiveView = 'opener' | 'binder' | 'history';
+type EngineStatus = 'checking' | 'ready' | 'waking' | 'unavailable';
 export type AppStep = 'start' | 'select-set' | 'open-pack';
 
 type PackOpenerProps = {
@@ -47,11 +49,13 @@ const initialSessionStats: SessionStats = {
 
 export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const persistedSession = useMemo(() => loadPersistedSession(), []);
-  const [sets, setSets] = useState<SupportedSetDto[]>([]);
+  const [sets, setSets] = useState<SupportedSetDto[]>(FALLBACK_SUPPORTED_SETS);
   const [selectedSetCode, setSelectedSetCode] = useState(persistedSession?.selectedSetCode ?? DEFAULT_SET_CODE);
   const [pack, setPack] = useState<OpenedPackDto | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingSets, setIsLoadingSets] = useState(true);
+  const [engineStatus, setEngineStatus] = useState<EngineStatus>('checking');
+  const [engineRetryKey, setEngineRetryKey] = useState(0);
+  const [engineWaitSeconds, setEngineWaitSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [sessionStats, setSessionStats] = useState<SessionStats>(persistedSession?.sessionStats ?? initialSessionStats);
   const [revealMode, setRevealMode] = useState<RevealMode>(persistedSession?.revealMode ?? 'all');
@@ -76,6 +80,20 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   useEffect(() => {
     preloadPackWrapperImages();
   }, []);
+
+  useEffect(() => {
+    if (engineStatus !== 'checking' && engineStatus !== 'waking') {
+      setEngineWaitSeconds(0);
+      return;
+    }
+
+    const startedAt = Date.now();
+    const intervalId = window.setInterval(() => {
+      setEngineWaitSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [engineRetryKey, engineStatus]);
 
   useEffect(() => {
     savePersistedSession({
@@ -105,25 +123,37 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
 
   useEffect(() => {
     let ignore = false;
+    let retryTimeoutId: number | undefined;
 
     async function loadSets() {
+      setEngineStatus('checking');
+      setError(null);
+
       try {
+        await fetchApiHealth().catch(() => undefined);
         const supportedSets = await fetchSupportedSets();
         if (ignore) {
           return;
         }
 
-        setSets(supportedSets);
-        if (supportedSets.length > 0 && !supportedSets.some((set) => set.setCode === selectedSetCode)) {
-          setSelectedSetCode(supportedSets[0].setCode);
+        const hydratedSets = supportedSets.length > 0 ? supportedSets : FALLBACK_SUPPORTED_SETS;
+        setSets(hydratedSets);
+        if (hydratedSets.length > 0 && !hydratedSets.some((set) => set.setCode === selectedSetCode)) {
+          setSelectedSetCode(hydratedSets[0].setCode);
         }
+        setEngineStatus('ready');
       } catch (caughtError) {
+        if (ignore) {
+          return;
+        }
+
         const message = caughtError instanceof Error ? caughtError.message : 'Unable to load supported sets.';
         setError(message);
-      } finally {
-        if (!ignore) {
-          setIsLoadingSets(false);
-        }
+        setSets((currentSets) => (currentSets.length > 0 ? currentSets : FALLBACK_SUPPORTED_SETS));
+        setEngineStatus('waking');
+        retryTimeoutId = window.setTimeout(() => {
+          setEngineRetryKey((currentKey) => currentKey + 1);
+        }, 15000);
       }
     }
 
@@ -131,8 +161,11 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
 
     return () => {
       ignore = true;
+      if (retryTimeoutId) {
+        window.clearTimeout(retryTimeoutId);
+      }
     };
-  }, []);
+  }, [engineRetryKey]);
 
   useEffect(() => {
     if (sets.length <= 1 || appStep !== 'start') {
@@ -165,14 +198,14 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   } as CSSProperties;
 
   useEffect(() => {
-    if (isLoadingSets || sets.length === 0) {
+    if (engineStatus !== 'ready' || sets.length === 0) {
       return;
     }
 
     warmUpPack(selectedSetCode, selectedBoosterType).catch(() => {
       // Warmup is an opportunistic cache fill; opening the pack still handles real errors.
     });
-  }, [isLoadingSets, selectedBoosterType, selectedSetCode, sets.length]);
+  }, [engineStatus, selectedBoosterType, selectedSetCode, sets.length]);
 
   function resetCurrentPack() {
     setPack(null);
@@ -221,6 +254,11 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   }
 
   async function handleOpenPack() {
+    if (!isEngineReady) {
+      setError('The pack engine is still waking up. Try opening a pack again in a moment.');
+      return;
+    }
+
     setIsLoading(true);
     setIsOpeningWrapper(!isFastMode);
     setError(null);
@@ -238,7 +276,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
         delay(isFastMode ? 0 : 950),
       ]);
       setPack(openedPack);
-      setRevealedCount(revealMode === 'all' ? openedPack.cards.length : 0);
+      setRevealedCount(revealMode === 'all' ? openedPack.cards.length : isFastMode ? 1 : 0);
       setRevealPhase(revealMode === 'all' ? 'complete' : 'revealing');
       setHasCountedCurrentPack(revealMode === 'all');
       if (revealMode === 'all') {
@@ -258,10 +296,13 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     : [];
   const isCinematicReveal = Boolean(pack && revealMode === 'one-by-one' && revealPhase === 'revealing');
   const canAdvanceReveal = Boolean(pack && revealPhase === 'revealing');
+  const hasRevealedEveryCard = Boolean(pack && revealedCount >= pack.cards.length);
   const isRevealLocked = Boolean(
     pack && revealMode === 'one-by-one' && revealPhase === 'revealing' && !hasCountedCurrentPack,
   );
-  const canStartOpeningFlow = !isLoadingSets && sets.length > 0;
+  const isPackControlLocked = isLoading || isOpeningWrapper || isRevealLocked;
+  const isEngineReady = engineStatus === 'ready';
+  const canStartOpeningFlow = sets.length > 0;
   const normalizedChaseName = chaseCardName.trim().toLowerCase();
 
   function completePack(openedPack: OpenedPackDto) {
@@ -333,14 +374,23 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
               >
                 Play
               </button>
-              {isLoadingSets && (
-                <p className="self-center text-sm font-semibold text-stone-300">
-                  Waking the pack engine...
-                </p>
+              {engineStatus !== 'ready' && (
+                <div className="max-w-md self-center text-sm font-semibold text-stone-300">
+                  <p>{getEngineStatusMessage(engineStatus, engineWaitSeconds)}</p>
+                  {(engineStatus === 'waking' || engineWaitSeconds >= 8) && (
+                    <button
+                      className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-ember underline-offset-4 hover:underline"
+                      onClick={() => setEngineRetryKey((currentKey) => currentKey + 1)}
+                      type="button"
+                    >
+                      Check again
+                    </button>
+                  )}
+                </div>
               )}
-              {!isLoadingSets && error && sets.length === 0 && (
+              {engineStatus === 'ready' && error && sets.length === 0 && (
                 <p className="max-w-sm self-center text-sm font-semibold text-red-100">
-                  Could not reach the pack engine. Try refreshing in a moment.
+                  Could not load supported sets. Try refreshing in a moment.
                 </p>
               )}
             </div>
@@ -364,7 +414,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       <>
         <SetSelector
           boosterTypesBySetCode={boosterTypesBySetCode}
-          isLoading={isLoadingSets}
+          isLoading={false}
           onBack={() => setAppStep('start')}
           onBoosterTypeChange={handleBoosterTypeChange}
           onContinue={() => setAppStep('open-pack')}
@@ -401,6 +451,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                       Pack type
                       <select
                         className="mt-1 block min-w-44 rounded-md border border-white/10 bg-stone-950 px-3 py-2 text-sm font-semibold normal-case tracking-normal text-white outline-none transition focus:border-ember"
+                        disabled={isPackControlLocked}
                         onChange={(event) => handleBoosterTypeChange(selectedSetCode, event.target.value as BoosterType)}
                         value={selectedBoosterType}
                       >
@@ -435,7 +486,8 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                     Home
                   </button>
                   <button
-                    className="rounded-md border border-white/15 bg-white/[0.05] px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] text-stone-100 transition hover:border-white/35 hover:bg-white/10"
+                    className="rounded-md border border-white/15 bg-white/[0.05] px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] text-stone-100 transition hover:border-white/35 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={isPackControlLocked}
                     onClick={() => setAppStep('select-set')}
                     type="button"
                   >
@@ -443,21 +495,34 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                   </button>
                   <button
                     className="rounded-md bg-ember px-5 py-3 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-                    disabled={isLoading || isLoadingSets || isRevealLocked}
+                    disabled={!isEngineReady || isLoading || isOpeningWrapper || isRevealLocked}
                     onClick={handleOpenPack}
                     type="button"
                   >
-                    {isLoading ? 'Opening...' : 'Open Pack'}
+                    {isLoading
+                      ? 'Opening...'
+                      : isRevealLocked
+                        ? 'Finish Reveal First'
+                        : isEngineReady
+                          ? 'Open Pack'
+                          : 'Engine Waking'}
                   </button>
                 </div>
               </div>
 
+              {!isEngineReady && (
+                <div className="mt-4 rounded-md border border-ember/25 bg-ember/10 px-4 py-3 text-sm font-semibold text-amber-100">
+                  {getEngineStatusMessage(engineStatus, engineWaitSeconds)} You can choose a set now; pack opening unlocks when the engine responds.
+                </div>
+              )}
+
               <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
                 <button
-                  className={`rounded-md px-4 py-2 text-sm font-semibold transition ${revealMode === 'all' ? 'bg-amethyst text-white' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
+                  className={`rounded-md px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${revealMode === 'all' ? 'bg-amethyst text-white' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
+                  disabled={isLoading || isOpeningWrapper}
                   onClick={() => {
                     setRevealMode('all');
-                  if (pack) {
+                    if (pack) {
                       setRevealedCount(pack.cards.length);
                       setRevealPhase('complete');
                       if (!hasCountedCurrentPack) {
@@ -470,7 +535,8 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                   Reveal all
                 </button>
                 <button
-                  className={`rounded-md px-4 py-2 text-sm font-semibold transition ${revealMode === 'one-by-one' ? 'bg-amethyst text-white' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
+                  className={`rounded-md px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${revealMode === 'one-by-one' ? 'bg-amethyst text-white' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
+                  disabled={isLoading || isOpeningWrapper}
                   onClick={() => {
                     setRevealMode('one-by-one');
                     if (pack) {
@@ -482,16 +548,17 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                 >
                   One by one
                 </button>
-                <label className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${isFastMode ? 'bg-emerald-400 text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}>
+                <label className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${isFastMode ? 'bg-emerald-400 text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'} ${isLoading || isOpeningWrapper ? 'cursor-not-allowed opacity-50' : ''}`}>
                   <input
                     checked={isFastMode}
                     className="h-4 w-4 accent-emerald-400"
+                    disabled={isLoading || isOpeningWrapper}
                     onChange={(event) => setIsFastMode(event.target.checked)}
                     type="checkbox"
                   />
                   Quick Open
                 </label>
-                {revealMode === 'one-by-one' && pack && (
+                {revealMode === 'one-by-one' && pack && revealPhase === 'revealing' && (
                   <>
                     <button
                       className="rounded-md border border-ember/40 px-4 py-2 text-sm font-semibold text-ember transition hover:border-ember hover:bg-ember/10 disabled:cursor-not-allowed disabled:opacity-50"
@@ -505,11 +572,13 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                       }}
                       type="button"
                     >
-                      {revealedCount >= pack.cards.length
-                        ? 'Continue'
-                        : `Reveal next (${revealedCount}/${pack.cards.length})`}
+                      {hasRevealedEveryCard
+                        ? 'Finish pack'
+                        : revealedCount === 0
+                          ? `Reveal first card (0/${pack.cards.length})`
+                          : `Reveal next (${revealedCount}/${pack.cards.length})`}
                     </button>
-                    {isFastMode && revealedCount < pack.cards.length && (
+                    {isFastMode && !hasRevealedEveryCard && (
                       <button
                         className="rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-stone-200 transition hover:border-white/35 hover:bg-white/10"
                         onClick={revealRemainingCards}
@@ -517,6 +586,11 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                       >
                         Reveal remaining
                       </button>
+                    )}
+                    {hasRevealedEveryCard && !hasCountedCurrentPack && (
+                      <p className="text-sm font-medium text-stone-400">
+                        Finish this pack to add it to stats, binder, and history.
+                      </p>
                     )}
                   </>
                 )}
@@ -573,7 +647,12 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
             </section>
           ) : pack ? (
             isCinematicReveal ? (
-              <CardRevealStack cards={displayedCards} onSelectCard={setSelectedCard} />
+              <CardRevealStack
+                cards={displayedCards}
+                isFastMode={isFastMode}
+                onSelectCard={setSelectedCard}
+                totalCards={pack.cards.length}
+              />
             ) : pack.cards.length > 0 ? (
               <CardGrid cards={pack.cards} onSelectCard={setSelectedCard} />
             ) : (
@@ -631,6 +710,22 @@ function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, milliseconds);
   });
+}
+
+function getEngineStatusMessage(engineStatus: EngineStatus, waitSeconds: number): string {
+  if (engineStatus === 'ready') {
+    return 'Pack engine ready.';
+  }
+
+  if (engineStatus === 'unavailable') {
+    return 'The pack engine is unavailable right now.';
+  }
+
+  if (waitSeconds >= 30) {
+    return 'Still waking the pack engine. Free hosting can take about a minute after inactivity.';
+  }
+
+  return 'Starting the pack engine. Free hosting can take about a minute after inactivity.';
 }
 
 function getBoosterTypeForSet(

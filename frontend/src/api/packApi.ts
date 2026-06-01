@@ -2,8 +2,23 @@ import type { BoosterType } from '../packLabels';
 import type { OpenedPackDto, SupportedSetDto } from '../types/pack';
 import { apiUrl } from './apiUrl';
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
+const PACK_OPENING_TIMEOUT_MS = 30000;
+
+export async function fetchApiHealth(): Promise<void> {
+  const response = await fetchWithTimeout(apiUrl('/api/health'), DEFAULT_REQUEST_TIMEOUT_MS, {
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Pack engine health check failed with status ${response.status}`);
+  }
+}
+
 export async function fetchSupportedSets(): Promise<SupportedSetDto[]> {
-  const response = await fetch(apiUrl('/api/sets'), {
+  const response = await fetchWithTimeout(apiUrl('/api/sets'), DEFAULT_REQUEST_TIMEOUT_MS, {
     headers: {
       Accept: 'application/json',
     },
@@ -17,16 +32,13 @@ export async function fetchSupportedSets(): Promise<SupportedSetDto[]> {
 }
 
 export async function openPack(setCode: string, boosterType: BoosterType): Promise<OpenedPackDto> {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 30000);
   const searchParams = new URLSearchParams({ boosterType });
 
   try {
-    const response = await fetch(apiUrl(`/api/packs/${setCode}/open?${searchParams.toString()}`), {
+    const response = await fetchWithTimeout(apiUrl(`/api/packs/${setCode}/open?${searchParams.toString()}`), PACK_OPENING_TIMEOUT_MS, {
       headers: {
         Accept: 'application/json',
       },
-      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -44,15 +56,13 @@ export async function openPack(setCode: string, boosterType: BoosterType): Promi
       throw new Error('Opening this pack took too long. Please try again.');
     }
     throw error;
-  } finally {
-    window.clearTimeout(timeoutId);
   }
 }
 
 export async function warmUpPack(setCode: string, boosterType: BoosterType): Promise<void> {
   const searchParams = new URLSearchParams({ boosterType });
 
-  const response = await fetch(apiUrl(`/api/packs/${setCode}/warmup?${searchParams.toString()}`), {
+  const response = await fetchWithTimeout(apiUrl(`/api/packs/${setCode}/warmup?${searchParams.toString()}`), DEFAULT_REQUEST_TIMEOUT_MS, {
     headers: {
       Accept: 'application/json',
     },
@@ -61,4 +71,20 @@ export async function warmUpPack(setCode: string, boosterType: BoosterType): Pro
   if (!response.ok) {
     throw new Error(`Pack warmup failed with status ${response.status}`);
   }
+}
+
+function fetchWithTimeout(
+  input: RequestInfo | URL,
+  timeoutMs: number,
+  init: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  return fetch(input, {
+    ...init,
+    signal: controller.signal,
+  }).finally(() => {
+    window.clearTimeout(timeoutId);
+  });
 }

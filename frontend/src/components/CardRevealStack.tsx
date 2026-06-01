@@ -2,7 +2,9 @@ import type { CardDto } from '../types/pack';
 
 type CardRevealStackProps = {
   cards: CardDto[];
+  isFastMode: boolean;
   onSelectCard: (card: CardDto) => void;
+  totalCards: number;
 };
 
 const rarityGlowStyles: Record<string, string> = {
@@ -12,7 +14,7 @@ const rarityGlowStyles: Record<string, string> = {
   mythic: 'border-orange-300 shadow-[0_0_52px_rgba(251,146,60,0.48)]',
 };
 
-export function CardRevealStack({ cards, onSelectCard }: CardRevealStackProps) {
+export function CardRevealStack({ cards, isFastMode, onSelectCard, totalCards }: CardRevealStackProps) {
   const currentCard = cards.length > 0 ? cards[cards.length - 1] : null;
   const stackedCards = cards.slice(Math.max(cards.length - 5, 0), -1);
   const isMythicReveal = currentCard?.rarity === 'mythic';
@@ -21,6 +23,14 @@ export function CardRevealStack({ cards, onSelectCard }: CardRevealStackProps) {
     <section className="relative flex min-h-[34rem] items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.16),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] px-6 py-10 shadow-card">
       <div className="absolute inset-x-10 top-10 h-px bg-gradient-to-r from-transparent via-ember/50 to-transparent" />
       {isMythicReveal && <div className="mythic-reveal-burst" />}
+      <div className="absolute left-4 top-4 rounded-md border border-white/10 bg-black/35 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-stone-300 backdrop-blur">
+        {cards.length > 0 ? `Card ${cards.length} of ${totalCards}` : 'Ready'}
+      </div>
+      {isFastMode && (
+        <div className="absolute right-4 top-4 rounded-md border border-emerald-300/30 bg-emerald-400/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-100 backdrop-blur">
+          Quick Open
+        </div>
+      )}
       <div className="relative flex h-[30rem] w-full max-w-md items-center justify-center">
         {stackedCards.map((card, index) => {
           const stackDepth = stackedCards.length - index;
@@ -61,7 +71,7 @@ export function CardRevealStack({ cards, onSelectCard }: CardRevealStackProps) {
           </button>
         ) : (
           <div className="rounded-lg border border-dashed border-white/15 bg-white/[0.03] px-6 py-10 text-center text-stone-400">
-            Click Reveal next to turn over your cards.
+            Pack is ready. Reveal the first card when you are set.
           </div>
         )}
       </div>
