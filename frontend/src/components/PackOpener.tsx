@@ -5,11 +5,12 @@ import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabe
 import { preloadPackWrapperImages } from '../packWrapperImages';
 import { clearPersistedSession, loadPersistedSession, savePersistedSession } from '../sessionStorage';
 import { getSetTheme } from '../setThemes';
-import type { CardDto, OpenedPackDto, SessionStats, SupportedSetDto } from '../types/pack';
+import type { CardDto, OpenedPackDto, PackHistoryEntry, SessionStats, SupportedSetDto } from '../types/pack';
 import { BinderPage } from './BinderPage';
 import { CardGrid } from './CardGrid';
 import { CardPreviewModal } from './CardPreviewModal';
 import { CardRevealStack } from './CardRevealStack';
+import { PackHistoryPage } from './PackHistoryPage';
 import { PackSummary } from './PackSummary';
 import { PackWrapper } from './PackWrapper';
 import { SessionStatsPanel } from './SessionStatsPanel';
@@ -25,7 +26,7 @@ const LANDING_FALLBACK_SET: SupportedSetDto = {
 };
 type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
-type ActiveView = 'opener' | 'binder';
+type ActiveView = 'opener' | 'binder' | 'history';
 type AppStep = 'start' | 'select-set' | 'open-pack';
 
 const initialSessionStats: SessionStats = {
@@ -55,7 +56,9 @@ export function PackOpener() {
   const [hasCountedCurrentPack, setHasCountedCurrentPack] = useState(false);
   const [summaryPack, setSummaryPack] = useState<OpenedPackDto | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>(persistedSession?.activeView ?? 'opener');
+  const [allPulledCards, setAllPulledCards] = useState<CardDto[]>(persistedSession?.allPulledCards ?? []);
   const [binderCards, setBinderCards] = useState<CardDto[]>(persistedSession?.binderCards ?? []);
+  const [packHistory, setPackHistory] = useState<PackHistoryEntry[]>(persistedSession?.packHistory ?? []);
   const [appStep, setAppStep] = useState<AppStep>('start');
   const [boosterTypesBySetCode, setBoosterTypesBySetCode] = useState<Record<string, BoosterType>>(
     persistedSession?.boosterTypesBySetCode ?? {},
@@ -73,15 +76,28 @@ export function PackOpener() {
   useEffect(() => {
     savePersistedSession({
       activeView,
+      allPulledCards,
       binderCards,
       boosterTypesBySetCode,
       chaseCardName,
       isFastMode,
+      packHistory,
       revealMode,
       selectedSetCode,
       sessionStats,
     });
-  }, [activeView, binderCards, boosterTypesBySetCode, chaseCardName, isFastMode, revealMode, selectedSetCode, sessionStats]);
+  }, [
+    activeView,
+    allPulledCards,
+    binderCards,
+    boosterTypesBySetCode,
+    chaseCardName,
+    isFastMode,
+    packHistory,
+    revealMode,
+    selectedSetCode,
+    sessionStats,
+  ]);
 
   useEffect(() => {
     let ignore = false;
@@ -168,7 +184,9 @@ export function PackOpener() {
     clearPersistedSession();
     resetCurrentPack();
     setSessionStats(initialSessionStats);
+    setAllPulledCards([]);
     setBinderCards([]);
+    setPackHistory([]);
     setChaseCardName('');
     setChaseHitCard(null);
     setSelectedCard(null);
@@ -245,7 +263,12 @@ export function PackOpener() {
   function completePack(openedPack: OpenedPackDto) {
     setSummaryPack(openedPack);
     setSessionStats((currentStats) => updateSessionStats(currentStats, openedPack, selectedBooster.msrpUsd));
+    setAllPulledCards((currentCards) => [...openedPack.cards, ...currentCards]);
     setBinderCards((currentCards) => updateBinderCards(currentCards, openedPack));
+    setPackHistory((currentHistory) => [
+      createPackHistoryEntry(openedPack, selectedBoosterType, currentHistory.length + 1),
+      ...currentHistory,
+    ]);
     setHasCountedCurrentPack(true);
 
     const chasePull = findChaseCard(openedPack.cards, normalizedChaseName);
@@ -388,11 +411,11 @@ export function PackOpener() {
                       MSRP ${selectedBooster.msrpUsd.toFixed(2)}
                     </p>
                     <label className="min-w-56 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Chase card
+                      Chase cards
                       <input
                         className="mt-1 block w-full rounded-md border border-white/10 bg-stone-950 px-3 py-2 text-sm font-semibold normal-case tracking-normal text-white outline-none transition placeholder:text-stone-600 focus:border-ember"
                         onChange={(event) => setChaseCardName(event.target.value)}
-                        placeholder="Card name"
+                        placeholder="Name or names"
                         type="text"
                         value={chaseCardName}
                       />
@@ -455,13 +478,15 @@ export function PackOpener() {
                 >
                   One by one
                 </button>
-                <button
-                  className={`rounded-md px-4 py-2 text-sm font-semibold transition ${isFastMode ? 'bg-emerald-400 text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
-                  onClick={() => setIsFastMode((currentValue) => !currentValue)}
-                  type="button"
-                >
-                  Fast Mode
-                </button>
+                <label className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${isFastMode ? 'bg-emerald-400 text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}>
+                  <input
+                    checked={isFastMode}
+                    className="h-4 w-4 accent-emerald-400"
+                    onChange={(event) => setIsFastMode(event.target.checked)}
+                    type="checkbox"
+                  />
+                  Quick Open
+                </label>
                 {revealMode === 'one-by-one' && pack && (
                   <>
                     <button
@@ -522,10 +547,19 @@ export function PackOpener() {
             >
               Binder
             </button>
+            <button
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${activeView === 'history' ? 'bg-ember text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
+              onClick={() => setActiveView('history')}
+              type="button"
+            >
+              History
+            </button>
           </div>
 
           {activeView === 'binder' ? (
-            <BinderPage cards={binderCards} onSelectCard={setSelectedCard} />
+            <BinderPage cards={allPulledCards} onSelectCard={setSelectedCard} />
+          ) : activeView === 'history' ? (
+            <PackHistoryPage entries={packHistory} onSelectCard={setSelectedCard} />
           ) : isOpeningWrapper ? (
             <section className="relative flex min-h-[28rem] items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[radial-gradient(circle_at_center,rgba(244,184,96,0.14),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] px-6 py-10 shadow-card">
               <div className="absolute inset-x-10 top-10 h-px bg-gradient-to-r from-transparent via-ember/50 to-transparent" />
@@ -616,7 +650,35 @@ function findChaseCard(cards: CardDto[], normalizedChaseName: string): CardDto |
     return null;
   }
 
-  return cards.find((card) => card.name.toLowerCase() === normalizedChaseName) ?? null;
+  const chaseNames = normalizedChaseName
+    .split(/[,;\n]/)
+    .map((name) => name.trim())
+    .filter(Boolean);
+
+  return cards.find((card) => {
+    const normalizedCardName = card.name.toLowerCase();
+    return chaseNames.some((chaseName) => (
+      normalizedCardName === chaseName
+      || normalizedCardName.includes(chaseName)
+      || chaseName.includes(normalizedCardName)
+    ));
+  }) ?? null;
+}
+
+function createPackHistoryEntry(
+  pack: OpenedPackDto,
+  boosterType: BoosterType,
+  packNumber: number,
+): PackHistoryEntry {
+  return {
+    boosterType,
+    cards: pack.cards,
+    id: `${Date.now()}-${packNumber}`,
+    openedAt: new Date().toISOString(),
+    packNumber,
+    setCode: pack.setCode,
+    totalValueUsd: pack.totalValueUsd,
+  };
 }
 
 function updateBinderCards(currentCards: CardDto[], pack: OpenedPackDto): CardDto[] {

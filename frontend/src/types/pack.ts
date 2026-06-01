@@ -12,6 +12,16 @@ export type OpenedPackDto = {
   totalValueUsd: number;
 };
 
+export type PackHistoryEntry = {
+  boosterType: string;
+  cards: CardDto[];
+  id: string;
+  openedAt: string;
+  packNumber: number;
+  setCode: string;
+  totalValueUsd: number;
+};
+
 export type SupportedSetDto = {
   setCode: string;
   setName: string;

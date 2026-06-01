@@ -1,12 +1,14 @@
 import type { BoosterType } from './packLabels';
-import type { CardDto, SessionStats } from './types/pack';
+import type { CardDto, PackHistoryEntry, SessionStats } from './types/pack';
 
 export type PersistedSessionState = {
-  activeView: 'opener' | 'binder';
+  activeView: 'opener' | 'binder' | 'history';
+  allPulledCards: CardDto[];
   binderCards: CardDto[];
   boosterTypesBySetCode: Record<string, BoosterType>;
   chaseCardName: string;
   isFastMode: boolean;
+  packHistory: PackHistoryEntry[];
   revealMode: 'all' | 'one-by-one';
   selectedSetCode: string;
   sessionStats: SessionStats;
@@ -42,10 +44,12 @@ export function loadPersistedSession(): PersistedSessionState | null {
 
     return {
       activeView: parsedSession.activeView,
+      allPulledCards: parsedSession.allPulledCards ?? parsedSession.binderCards ?? [],
       binderCards: parsedSession.binderCards ?? [],
       boosterTypesBySetCode: parsedSession.boosterTypesBySetCode ?? {},
       chaseCardName: parsedSession.chaseCardName ?? '',
       isFastMode: parsedSession.isFastMode ?? false,
+      packHistory: parsedSession.packHistory ?? [],
       revealMode: parsedSession.revealMode,
       selectedSetCode: parsedSession.selectedSetCode,
       sessionStats: parsedSession.sessionStats,
