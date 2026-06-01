@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { fetchSupportedSets, openPack } from '../api/packApi';
 import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabels';
 import { preloadPackWrapperImages } from '../packWrapperImages';
+import { clearPersistedSession, loadPersistedSession, savePersistedSession } from '../sessionStorage';
 import { getSetTheme } from '../setThemes';
 import type { CardDto, OpenedPackDto, SessionStats, SupportedSetDto } from '../types/pack';
 import { BinderPage } from './BinderPage';
@@ -39,29 +40,43 @@ const initialSessionStats: SessionStats = {
 };
 
 export function PackOpener() {
+  const persistedSession = useMemo(() => loadPersistedSession(), []);
   const [sets, setSets] = useState<SupportedSetDto[]>([]);
-  const [selectedSetCode, setSelectedSetCode] = useState(DEFAULT_SET_CODE);
+  const [selectedSetCode, setSelectedSetCode] = useState(persistedSession?.selectedSetCode ?? DEFAULT_SET_CODE);
   const [pack, setPack] = useState<OpenedPackDto | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingSets, setIsLoadingSets] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sessionStats, setSessionStats] = useState<SessionStats>(initialSessionStats);
-  const [revealMode, setRevealMode] = useState<RevealMode>('all');
+  const [sessionStats, setSessionStats] = useState<SessionStats>(persistedSession?.sessionStats ?? initialSessionStats);
+  const [revealMode, setRevealMode] = useState<RevealMode>(persistedSession?.revealMode ?? 'all');
   const [revealPhase, setRevealPhase] = useState<RevealPhase>('idle');
   const [revealedCount, setRevealedCount] = useState(0);
   const [selectedCard, setSelectedCard] = useState<CardDto | null>(null);
   const [hasCountedCurrentPack, setHasCountedCurrentPack] = useState(false);
   const [summaryPack, setSummaryPack] = useState<OpenedPackDto | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('opener');
-  const [binderCards, setBinderCards] = useState<CardDto[]>([]);
+  const [activeView, setActiveView] = useState<ActiveView>(persistedSession?.activeView ?? 'opener');
+  const [binderCards, setBinderCards] = useState<CardDto[]>(persistedSession?.binderCards ?? []);
   const [appStep, setAppStep] = useState<AppStep>('start');
-  const [boosterTypesBySetCode, setBoosterTypesBySetCode] = useState<Record<string, BoosterType>>({});
+  const [boosterTypesBySetCode, setBoosterTypesBySetCode] = useState<Record<string, BoosterType>>(
+    persistedSession?.boosterTypesBySetCode ?? {},
+  );
   const [isOpeningWrapper, setIsOpeningWrapper] = useState(false);
   const [landingSetIndex, setLandingSetIndex] = useState(0);
 
   useEffect(() => {
     preloadPackWrapperImages();
   }, []);
+
+  useEffect(() => {
+    savePersistedSession({
+      activeView,
+      binderCards,
+      boosterTypesBySetCode,
+      revealMode,
+      selectedSetCode,
+      sessionStats,
+    });
+  }, [activeView, binderCards, boosterTypesBySetCode, revealMode, selectedSetCode, sessionStats]);
 
   useEffect(() => {
     let ignore = false;
@@ -74,7 +89,7 @@ export function PackOpener() {
         }
 
         setSets(supportedSets);
-        if (supportedSets.length > 0 && !supportedSets.some((set) => set.setCode === DEFAULT_SET_CODE)) {
+        if (supportedSets.length > 0 && !supportedSets.some((set) => set.setCode === selectedSetCode)) {
           setSelectedSetCode(supportedSets[0].setCode);
         }
       } catch (caughtError) {
@@ -131,6 +146,19 @@ export function PackOpener() {
     setRevealedCount(0);
     setHasCountedCurrentPack(false);
     setActiveView('opener');
+  }
+
+  function resetSession() {
+    clearPersistedSession();
+    resetCurrentPack();
+    setSessionStats(initialSessionStats);
+    setBinderCards([]);
+    setSelectedCard(null);
+    setRevealMode('all');
+    setBoosterTypesBySetCode({});
+    setSelectedSetCode(sets[0]?.setCode ?? DEFAULT_SET_CODE);
+    setAppStep('start');
+    setError(null);
   }
 
   function handleSelectedSetChange(setCode: string) {
@@ -443,7 +471,7 @@ export function PackOpener() {
 
         <div className="space-y-5">
           <PackSummary pack={summaryPack} isLoading={isLoading} selectedSetCode={selectedSetCode} />
-          <SessionStatsPanel stats={sessionStats} />
+          <SessionStatsPanel onResetSession={resetSession} stats={sessionStats} />
         </div>
       </div>
 

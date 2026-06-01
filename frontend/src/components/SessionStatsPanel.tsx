@@ -2,17 +2,29 @@ import type { SessionStats } from '../types/pack';
 import { AnimatedCurrency } from './AnimatedCurrency';
 
 type SessionStatsPanelProps = {
+  onResetSession: () => void;
   stats: SessionStats;
 };
 
-export function SessionStatsPanel({ stats }: SessionStatsPanelProps) {
+export function SessionStatsPanel({ onResetSession, stats }: SessionStatsPanelProps) {
   const isProfitable = stats.netProfitLoss >= 0;
   const netPrefix = isProfitable ? '+' : '-';
   const netValue = Math.abs(stats.netProfitLoss);
+  const hasSessionData = stats.packsOpened > 0;
 
   return (
     <section className="rounded-lg border border-white/10 bg-stone-950/70 p-5 shadow-card">
-      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-ember">Session stats</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-ember">Session stats</p>
+        <button
+          className="rounded-md border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-stone-300 transition hover:border-red-300/50 hover:bg-red-400/10 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/10 disabled:hover:bg-transparent disabled:hover:text-stone-300"
+          disabled={!hasSessionData}
+          onClick={onResetSession}
+          type="button"
+        >
+          Reset
+        </button>
+      </div>
       <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-md bg-white/[0.04] p-3">
           <dt className="text-stone-400">Packs opened</dt>
