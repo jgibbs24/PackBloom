@@ -27,7 +27,12 @@ const LANDING_FALLBACK_SET: SupportedSetDto = {
 type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
 type ActiveView = 'opener' | 'binder' | 'history';
-type AppStep = 'start' | 'select-set' | 'open-pack';
+export type AppStep = 'start' | 'select-set' | 'open-pack';
+
+type PackOpenerProps = {
+  appStep: AppStep;
+  setAppStep: (appStep: AppStep) => void;
+};
 
 const initialSessionStats: SessionStats = {
   packsOpened: 0,
@@ -40,7 +45,7 @@ const initialSessionStats: SessionStats = {
   mythicsPulled: 0,
 };
 
-export function PackOpener() {
+export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const persistedSession = useMemo(() => loadPersistedSession(), []);
   const [sets, setSets] = useState<SupportedSetDto[]>([]);
   const [selectedSetCode, setSelectedSetCode] = useState(persistedSession?.selectedSetCode ?? DEFAULT_SET_CODE);
@@ -59,7 +64,6 @@ export function PackOpener() {
   const [allPulledCards, setAllPulledCards] = useState<CardDto[]>(persistedSession?.allPulledCards ?? []);
   const [binderCards, setBinderCards] = useState<CardDto[]>(persistedSession?.binderCards ?? []);
   const [packHistory, setPackHistory] = useState<PackHistoryEntry[]>(persistedSession?.packHistory ?? []);
-  const [appStep, setAppStep] = useState<AppStep>('start');
   const [boosterTypesBySetCode, setBoosterTypesBySetCode] = useState<Record<string, BoosterType>>(
     persistedSession?.boosterTypesBySetCode ?? {},
   );
