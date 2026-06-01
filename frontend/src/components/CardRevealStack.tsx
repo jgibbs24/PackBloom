@@ -2,7 +2,6 @@ import type { CardDto } from '../types/pack';
 
 type CardRevealStackProps = {
   cards: CardDto[];
-  suspenseCard?: CardDto | null;
   onSelectCard: (card: CardDto) => void;
 };
 
@@ -13,14 +12,7 @@ const rarityGlowStyles: Record<string, string> = {
   mythic: 'border-orange-300 shadow-[0_0_52px_rgba(251,146,60,0.48)]',
 };
 
-const suspenseGlowStyles: Record<string, string> = {
-  common: 'border-stone-500 shadow-[0_0_50px_rgba(120,113,108,0.36)]',
-  uncommon: 'border-slate-100 shadow-[0_0_58px_rgba(226,232,240,0.42)]',
-  rare: 'border-yellow-300 shadow-[0_0_68px_rgba(253,224,71,0.52)]',
-  mythic: 'border-orange-300 shadow-[0_0_78px_rgba(251,146,60,0.68)]',
-};
-
-export function CardRevealStack({ cards, suspenseCard, onSelectCard }: CardRevealStackProps) {
+export function CardRevealStack({ cards, onSelectCard }: CardRevealStackProps) {
   const currentCard = cards.length > 0 ? cards[cards.length - 1] : null;
   const stackedCards = cards.slice(Math.max(cards.length - 5, 0), -1);
   const isMythicReveal = currentCard?.rarity === 'mythic';
@@ -46,21 +38,6 @@ export function CardRevealStack({ cards, suspenseCard, onSelectCard }: CardRevea
             />
           );
         })}
-
-        {suspenseCard && (
-          <div
-            className={`card-suspense-back absolute z-30 flex aspect-[488/680] w-[min(76vw,22rem)] items-center justify-center rounded-xl border-2 bg-[radial-gradient(circle_at_50%_35%,rgba(244,184,96,0.28),transparent_28%),linear-gradient(145deg,#221a2f,#0f1018_58%,#050507)] p-5 ${suspenseGlowStyles[suspenseCard.rarity] ?? suspenseGlowStyles.common}`}
-          >
-            <div className="absolute inset-4 rounded-lg border border-white/10" />
-            <div className="absolute inset-8 rounded-full border border-ember/30" />
-            <div className="relative text-center">
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-ember">Rarity signal</p>
-              <p className="mt-3 text-3xl font-black uppercase tracking-[0.16em] text-white">
-                {suspenseCard.rarity}
-              </p>
-            </div>
-          </div>
-        )}
 
         {currentCard ? (
           <button

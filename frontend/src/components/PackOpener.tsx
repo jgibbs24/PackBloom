@@ -17,7 +17,6 @@ import { SetSelector } from './SetSelector';
 
 const DEFAULT_SET_CODE = 'blb';
 const FALLBACK_PACK_MSRP_USD = 5.99;
-const SUSPENSE_REVEAL_MS = 720;
 const LANDING_FALLBACK_SET: SupportedSetDto = {
   msrpUsd: FALLBACK_PACK_MSRP_USD,
   packType: 'play-booster-barebones',
@@ -66,7 +65,6 @@ export function PackOpener() {
   const [isFastMode, setIsFastMode] = useState(persistedSession?.isFastMode ?? false);
   const [chaseCardName, setChaseCardName] = useState(persistedSession?.chaseCardName ?? '');
   const [chaseHitCard, setChaseHitCard] = useState<CardDto | null>(null);
-  const [suspenseCard, setSuspenseCard] = useState<CardDto | null>(null);
 
   useEffect(() => {
     preloadPackWrapperImages();
@@ -164,7 +162,6 @@ export function PackOpener() {
     setHasCountedCurrentPack(false);
     setActiveView('opener');
     setChaseHitCard(null);
-    setSuspenseCard(null);
   }
 
   function resetSession() {
@@ -177,7 +174,6 @@ export function PackOpener() {
     setSelectedCard(null);
     setRevealMode('all');
     setIsFastMode(false);
-    setSuspenseCard(null);
     setBoosterTypesBySetCode({});
     setSelectedSetCode(sets[0]?.setCode ?? DEFAULT_SET_CODE);
     setAppStep('start');
@@ -210,7 +206,6 @@ export function PackOpener() {
     setPack(null);
     setSummaryPack(null);
     setChaseHitCard(null);
-    setSuspenseCard(null);
     setRevealPhase('idle');
     setRevealedCount(0);
     setHasCountedCurrentPack(false);
@@ -264,24 +259,13 @@ export function PackOpener() {
       return;
     }
 
-    const nextCard = pack.cards[revealedCount];
-    if (isFastMode) {
-      setRevealedCount((count) => Math.min(count + 1, pack.cards.length));
-      return;
-    }
-
-    setSuspenseCard(nextCard);
-    window.setTimeout(() => {
-      setRevealedCount((count) => Math.min(count + 1, pack.cards.length));
-      setSuspenseCard(null);
-    }, SUSPENSE_REVEAL_MS);
+    setRevealedCount((count) => Math.min(count + 1, pack.cards.length));
   }
 
   function revealRemainingCards() {
     if (!pack) {
       return;
     }
-    setSuspenseCard(null);
     setRevealedCount(pack.cards.length);
   }
 
@@ -482,7 +466,7 @@ export function PackOpener() {
                   <>
                     <button
                       className="rounded-md border border-ember/40 px-4 py-2 text-sm font-semibold text-ember transition hover:border-ember hover:bg-ember/10 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canAdvanceReveal || Boolean(suspenseCard)}
+                      disabled={!canAdvanceReveal}
                       onClick={() => {
                         if (revealedCount >= pack.cards.length) {
                           continueCompletedReveal();
@@ -551,7 +535,7 @@ export function PackOpener() {
             </section>
           ) : pack ? (
             isCinematicReveal ? (
-              <CardRevealStack cards={displayedCards} suspenseCard={suspenseCard} onSelectCard={setSelectedCard} />
+              <CardRevealStack cards={displayedCards} onSelectCard={setSelectedCard} />
             ) : pack.cards.length > 0 ? (
               <CardGrid cards={pack.cards} onSelectCard={setSelectedCard} />
             ) : (
