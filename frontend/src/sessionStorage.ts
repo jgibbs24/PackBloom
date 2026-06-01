@@ -5,6 +5,8 @@ export type PersistedSessionState = {
   activeView: 'opener' | 'binder';
   binderCards: CardDto[];
   boosterTypesBySetCode: Record<string, BoosterType>;
+  chaseCardName: string;
+  isFastMode: boolean;
   revealMode: 'all' | 'one-by-one';
   selectedSetCode: string;
   sessionStats: SessionStats;
@@ -42,6 +44,8 @@ export function loadPersistedSession(): PersistedSessionState | null {
       activeView: parsedSession.activeView,
       binderCards: parsedSession.binderCards ?? [],
       boosterTypesBySetCode: parsedSession.boosterTypesBySetCode ?? {},
+      chaseCardName: parsedSession.chaseCardName ?? '',
+      isFastMode: parsedSession.isFastMode ?? false,
       revealMode: parsedSession.revealMode,
       selectedSetCode: parsedSession.selectedSetCode,
       sessionStats: parsedSession.sessionStats,

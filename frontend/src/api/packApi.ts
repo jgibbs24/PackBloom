@@ -48,3 +48,17 @@ export async function openPack(setCode: string, boosterType: BoosterType): Promi
     window.clearTimeout(timeoutId);
   }
 }
+
+export async function warmUpPack(setCode: string, boosterType: BoosterType): Promise<void> {
+  const searchParams = new URLSearchParams({ boosterType });
+
+  const response = await fetch(apiUrl(`/api/packs/${setCode}/warmup?${searchParams.toString()}`), {
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Pack warmup failed with status ${response.status}`);
+  }
+}

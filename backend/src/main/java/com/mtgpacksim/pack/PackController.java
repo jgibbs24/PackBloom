@@ -32,4 +32,15 @@ public class PackController {
                 .orTimeout(PACK_OPENING_TIMEOUT.toSeconds(), TimeUnit.SECONDS)
                 .thenApply(ResponseEntity::ok);
     }
+
+    @GetMapping("/{setCode}/warmup")
+    public CompletableFuture<ResponseEntity<Void>> warmUpPack(
+            @PathVariable String setCode,
+            @RequestParam(defaultValue = "play") String boosterType
+    ) {
+        return CompletableFuture
+                .runAsync(() -> packOpeningService.warmUpPack(setCode, boosterType))
+                .orTimeout(PACK_OPENING_TIMEOUT.toSeconds(), TimeUnit.SECONDS)
+                .thenApply(ignored -> ResponseEntity.accepted().build());
+    }
 }

@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchSupportedSets, openPack } from '../api/packApi';
+import { fetchSupportedSets, openPack, warmUpPack } from '../api/packApi';
 import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabels';
 import { preloadPackWrapperImages } from '../packWrapperImages';
 import { clearPersistedSession, loadPersistedSession, savePersistedSession } from '../sessionStorage';
@@ -17,6 +17,7 @@ import { SetSelector } from './SetSelector';
 
 const DEFAULT_SET_CODE = 'blb';
 const FALLBACK_PACK_MSRP_USD = 5.99;
+const SUSPENSE_REVEAL_MS = 720;
 const LANDING_FALLBACK_SET: SupportedSetDto = {
   msrpUsd: FALLBACK_PACK_MSRP_USD,
   packType: 'play-booster-barebones',
@@ -62,6 +63,10 @@ export function PackOpener() {
   );
   const [isOpeningWrapper, setIsOpeningWrapper] = useState(false);
   const [landingSetIndex, setLandingSetIndex] = useState(0);
+  const [isFastMode, setIsFastMode] = useState(persistedSession?.isFastMode ?? false);
+  const [chaseCardName, setChaseCardName] = useState(persistedSession?.chaseCardName ?? '');
+  const [chaseHitCard, setChaseHitCard] = useState<CardDto | null>(null);
+  const [suspenseCard, setSuspenseCard] = useState<CardDto | null>(null);
 
   useEffect(() => {
     preloadPackWrapperImages();
@@ -72,11 +77,13 @@ export function PackOpener() {
       activeView,
       binderCards,
       boosterTypesBySetCode,
+      chaseCardName,
+      isFastMode,
       revealMode,
       selectedSetCode,
       sessionStats,
     });
-  }, [activeView, binderCards, boosterTypesBySetCode, revealMode, selectedSetCode, sessionStats]);
+  }, [activeView, binderCards, boosterTypesBySetCode, chaseCardName, isFastMode, revealMode, selectedSetCode, sessionStats]);
 
   useEffect(() => {
     let ignore = false;
@@ -139,6 +146,16 @@ export function PackOpener() {
     '--set-text': appStep === 'start' ? landingTheme.text : selectedTheme.text,
   } as CSSProperties;
 
+  useEffect(() => {
+    if (isLoadingSets || sets.length === 0) {
+      return;
+    }
+
+    warmUpPack(selectedSetCode, selectedBoosterType).catch(() => {
+      // Warmup is an opportunistic cache fill; opening the pack still handles real errors.
+    });
+  }, [isLoadingSets, selectedBoosterType, selectedSetCode, sets.length]);
+
   function resetCurrentPack() {
     setPack(null);
     setSummaryPack(null);
@@ -146,6 +163,8 @@ export function PackOpener() {
     setRevealedCount(0);
     setHasCountedCurrentPack(false);
     setActiveView('opener');
+    setChaseHitCard(null);
+    setSuspenseCard(null);
   }
 
   function resetSession() {
@@ -153,8 +172,12 @@ export function PackOpener() {
     resetCurrentPack();
     setSessionStats(initialSessionStats);
     setBinderCards([]);
+    setChaseCardName('');
+    setChaseHitCard(null);
     setSelectedCard(null);
     setRevealMode('all');
+    setIsFastMode(false);
+    setSuspenseCard(null);
     setBoosterTypesBySetCode({});
     setSelectedSetCode(sets[0]?.setCode ?? DEFAULT_SET_CODE);
     setAppStep('start');
@@ -181,11 +204,13 @@ export function PackOpener() {
 
   async function handleOpenPack() {
     setIsLoading(true);
-    setIsOpeningWrapper(true);
+    setIsOpeningWrapper(!isFastMode);
     setError(null);
     setActiveView('opener');
     setPack(null);
     setSummaryPack(null);
+    setChaseHitCard(null);
+    setSuspenseCard(null);
     setRevealPhase('idle');
     setRevealedCount(0);
     setHasCountedCurrentPack(false);
@@ -193,16 +218,14 @@ export function PackOpener() {
     try {
       const [openedPack] = await Promise.all([
         openPack(selectedSetCode, selectedBoosterType),
-        delay(950),
+        delay(isFastMode ? 0 : 950),
       ]);
       setPack(openedPack);
       setRevealedCount(revealMode === 'all' ? openedPack.cards.length : 0);
       setRevealPhase(revealMode === 'all' ? 'complete' : 'revealing');
       setHasCountedCurrentPack(revealMode === 'all');
       if (revealMode === 'all') {
-        setSummaryPack(openedPack);
-        setSessionStats((currentStats) => updateSessionStats(currentStats, openedPack, selectedBooster.msrpUsd));
-        setBinderCards((currentCards) => updateBinderCards(currentCards, openedPack));
+        completePack(openedPack);
       }
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Unable to open pack.';
@@ -222,6 +245,55 @@ export function PackOpener() {
     pack && revealMode === 'one-by-one' && revealPhase === 'revealing' && !hasCountedCurrentPack,
   );
   const canStartOpeningFlow = !isLoadingSets && sets.length > 0;
+  const normalizedChaseName = chaseCardName.trim().toLowerCase();
+
+  function completePack(openedPack: OpenedPackDto) {
+    setSummaryPack(openedPack);
+    setSessionStats((currentStats) => updateSessionStats(currentStats, openedPack, selectedBooster.msrpUsd));
+    setBinderCards((currentCards) => updateBinderCards(currentCards, openedPack));
+    setHasCountedCurrentPack(true);
+
+    const chasePull = findChaseCard(openedPack.cards, normalizedChaseName);
+    if (chasePull) {
+      setChaseHitCard(chasePull);
+    }
+  }
+
+  function revealNextCard() {
+    if (!pack || revealedCount >= pack.cards.length) {
+      return;
+    }
+
+    const nextCard = pack.cards[revealedCount];
+    if (isFastMode) {
+      setRevealedCount((count) => Math.min(count + 1, pack.cards.length));
+      return;
+    }
+
+    setSuspenseCard(nextCard);
+    window.setTimeout(() => {
+      setRevealedCount((count) => Math.min(count + 1, pack.cards.length));
+      setSuspenseCard(null);
+    }, SUSPENSE_REVEAL_MS);
+  }
+
+  function revealRemainingCards() {
+    if (!pack) {
+      return;
+    }
+    setSuspenseCard(null);
+    setRevealedCount(pack.cards.length);
+  }
+
+  function continueCompletedReveal() {
+    if (!pack) {
+      return;
+    }
+    setRevealPhase('complete');
+    if (!hasCountedCurrentPack) {
+      completePack(pack);
+    }
+  }
 
   if (appStep === 'start') {
     return (
@@ -331,6 +403,16 @@ export function PackOpener() {
                     <p className="pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       MSRP ${selectedBooster.msrpUsd.toFixed(2)}
                     </p>
+                    <label className="min-w-56 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                      Chase card
+                      <input
+                        className="mt-1 block w-full rounded-md border border-white/10 bg-stone-950 px-3 py-2 text-sm font-semibold normal-case tracking-normal text-white outline-none transition placeholder:text-stone-600 focus:border-ember"
+                        onChange={(event) => setChaseCardName(event.target.value)}
+                        placeholder="Card name"
+                        type="text"
+                        value={chaseCardName}
+                      />
+                    </label>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -364,14 +446,11 @@ export function PackOpener() {
                   className={`rounded-md px-4 py-2 text-sm font-semibold transition ${revealMode === 'all' ? 'bg-amethyst text-white' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
                   onClick={() => {
                     setRevealMode('all');
-                    if (pack) {
+                  if (pack) {
                       setRevealedCount(pack.cards.length);
                       setRevealPhase('complete');
                       if (!hasCountedCurrentPack) {
-                        setSummaryPack(pack);
-                        setSessionStats((currentStats) => updateSessionStats(currentStats, pack, selectedBooster.msrpUsd));
-                        setBinderCards((currentCards) => updateBinderCards(currentCards, pack));
-                        setHasCountedCurrentPack(true);
+                        completePack(pack);
                       }
                     }
                   }}
@@ -392,29 +471,41 @@ export function PackOpener() {
                 >
                   One by one
                 </button>
+                <button
+                  className={`rounded-md px-4 py-2 text-sm font-semibold transition ${isFastMode ? 'bg-emerald-400 text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
+                  onClick={() => setIsFastMode((currentValue) => !currentValue)}
+                  type="button"
+                >
+                  Fast Mode
+                </button>
                 {revealMode === 'one-by-one' && pack && (
-                  <button
-                    className="rounded-md border border-ember/40 px-4 py-2 text-sm font-semibold text-ember transition hover:border-ember hover:bg-ember/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!canAdvanceReveal}
-                    onClick={() => {
-                      if (revealedCount >= pack.cards.length) {
-                        setRevealPhase('complete');
-                        if (!hasCountedCurrentPack) {
-                          setSummaryPack(pack);
-                          setSessionStats((currentStats) => updateSessionStats(currentStats, pack, selectedBooster.msrpUsd));
-                          setBinderCards((currentCards) => updateBinderCards(currentCards, pack));
-                          setHasCountedCurrentPack(true);
+                  <>
+                    <button
+                      className="rounded-md border border-ember/40 px-4 py-2 text-sm font-semibold text-ember transition hover:border-ember hover:bg-ember/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!canAdvanceReveal || Boolean(suspenseCard)}
+                      onClick={() => {
+                        if (revealedCount >= pack.cards.length) {
+                          continueCompletedReveal();
+                          return;
                         }
-                        return;
-                      }
-                      setRevealedCount((count) => Math.min(count + 1, pack.cards.length));
-                    }}
-                    type="button"
-                  >
-                    {revealedCount >= pack.cards.length
-                      ? 'Continue'
-                      : `Reveal next (${revealedCount}/${pack.cards.length})`}
-                  </button>
+                        revealNextCard();
+                      }}
+                      type="button"
+                    >
+                      {revealedCount >= pack.cards.length
+                        ? 'Continue'
+                        : `Reveal next (${revealedCount}/${pack.cards.length})`}
+                    </button>
+                    {isFastMode && revealedCount < pack.cards.length && (
+                      <button
+                        className="rounded-md border border-white/15 px-4 py-2 text-sm font-semibold text-stone-200 transition hover:border-white/35 hover:bg-white/10"
+                        onClick={revealRemainingCards}
+                        type="button"
+                      >
+                        Reveal remaining
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -423,6 +514,12 @@ export function PackOpener() {
           {error && (
             <div className="mb-6 rounded-md border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
               {error}
+            </div>
+          )}
+
+          {chaseHitCard && (
+            <div className="mb-6 rounded-md border border-emerald-300/50 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100">
+              Chase hit: {chaseHitCard.name} (${chaseHitCard.priceUsd.toFixed(2)})
             </div>
           )}
 
@@ -454,7 +551,7 @@ export function PackOpener() {
             </section>
           ) : pack ? (
             isCinematicReveal ? (
-              <CardRevealStack cards={displayedCards} onSelectCard={setSelectedCard} />
+              <CardRevealStack cards={displayedCards} suspenseCard={suspenseCard} onSelectCard={setSelectedCard} />
             ) : pack.cards.length > 0 ? (
               <CardGrid cards={pack.cards} onSelectCard={setSelectedCard} />
             ) : (
@@ -528,6 +625,14 @@ function findBestCard(cards: CardDto[]): CardDto | null {
     }
     return best;
   }, null);
+}
+
+function findChaseCard(cards: CardDto[], normalizedChaseName: string): CardDto | null {
+  if (!normalizedChaseName) {
+    return null;
+  }
+
+  return cards.find((card) => card.name.toLowerCase() === normalizedChaseName) ?? null;
 }
 
 function updateBinderCards(currentCards: CardDto[], pack: OpenedPackDto): CardDto[] {

@@ -12,8 +12,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class PackOpeningService {
@@ -22,7 +22,6 @@ public class PackOpeningService {
     private final ScryfallClient scryfallClient;
     private final PackDefinitionService packDefinitionService;
     private final Map<String, List<CardDto>> cardPoolCache = new ConcurrentHashMap<>();
-    private final Random random = new Random();
 
     public PackOpeningService(ScryfallClient scryfallClient, PackDefinitionService packDefinitionService) {
         this.scryfallClient = scryfallClient;
@@ -35,11 +34,10 @@ public class PackOpeningService {
 
     public OpenedPackDto openPack(String setCode, String boosterType) {
         PackDefinition definition = packDefinitionService.getDefinition(setCode, boosterType);
-        List<CardDto> cards = new ArrayList<>();
-
-        for (PackSlot slot : definition.slots()) {
-            cards.addAll(drawSlot(slot));
-        }
+        List<CardDto> cards = definition.slots().parallelStream()
+                .map(this::drawSlot)
+                .flatMap(List::stream)
+                .toList();
 
         BigDecimal totalValueUsd = cards.stream()
                 .map(CardDto::priceUsd)
@@ -49,6 +47,11 @@ public class PackOpeningService {
         return new OpenedPackDto(definition.setCode(), cards, totalValueUsd);
     }
 
+    public void warmUpPack(String setCode, String boosterType) {
+        PackDefinition definition = packDefinitionService.getDefinition(setCode, boosterType);
+        definition.slots().parallelStream().forEach(this::warmUpSlot);
+    }
+
     private List<CardDto> drawSlot(PackSlot slot) {
         if (!slot.hasAlternatePool()) {
             return drawCards(slot.cacheKey(), slot.query(), slot.count());
@@ -56,7 +59,7 @@ public class PackOpeningService {
 
         List<CardDto> cards = new ArrayList<>();
         for (int cardIndex = 0; cardIndex < slot.count(); cardIndex++) {
-            boolean useAlternatePool = random.nextDouble() < slot.alternateChance();
+            boolean useAlternatePool = ThreadLocalRandom.current().nextDouble() < slot.alternateChance();
             String cacheKey = useAlternatePool ? slot.alternateCacheKey() : slot.cacheKey();
             String query = useAlternatePool ? slot.alternateQuery() : slot.query();
             cards.addAll(drawCards(cacheKey, query, 1));
@@ -69,8 +72,15 @@ public class PackOpeningService {
         if (pool.size() < count) {
             throw new PackOpeningException("Not enough cards were available for pack slot: " + cacheKey);
         }
-        Collections.shuffle(pool, random);
+        Collections.shuffle(pool);
         return pool.subList(0, count);
+    }
+
+    private void warmUpSlot(PackSlot slot) {
+        cardPool(slot.cacheKey(), slot.query());
+        if (slot.hasAlternatePool()) {
+            cardPool(slot.alternateCacheKey(), slot.alternateQuery());
+        }
     }
 
     private List<CardDto> cardPool(String cacheKey, String query) {

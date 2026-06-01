@@ -65,6 +65,17 @@ class PackOpeningServiceTest {
         verify(scryfallClient).searchCards("set:blb type:basic");
     }
 
+    @Test
+    void warmUpPackLoadsAllFixedAndAlternatePools() {
+        service.warmUpPack("blb", "collector");
+
+        verify(scryfallClient).searchCards("set:blb rarity:common -type:basic");
+        verify(scryfallClient).searchCards("set:blb rarity:uncommon");
+        verify(scryfallClient).searchCards("set:blb rarity:rare");
+        verify(scryfallClient).searchCards("set:blb rarity:mythic");
+        verify(scryfallClient).searchCards("set:blb type:basic");
+    }
+
     private void stubCardPools() {
         when(scryfallClient.searchCards(argThat(query -> query != null && query.contains("type:basic"))))
                 .thenReturn(cards("basic", 20));
