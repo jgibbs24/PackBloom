@@ -635,7 +635,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
           </div>
 
           {activeView === 'binder' ? (
-            <BinderPage cards={allPulledCards} onSelectCard={setSelectedCard} />
+            <BinderPage cards={allPulledCards} packHistory={packHistory} onSelectCard={setSelectedCard} />
           ) : activeView === 'history' ? (
             <PackHistoryPage entries={packHistory} onSelectCard={setSelectedCard} />
           ) : isOpeningWrapper ? (
