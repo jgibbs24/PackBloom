@@ -475,12 +475,12 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
           <div className="landing-set-rail absolute bottom-8 left-6 right-6 z-0 hidden gap-2 sm:flex">
             {sets.map((set) => (
               <span
-                className="h-1.5 flex-1 rounded-full bg-white/25"
+                className="h-1.5 w-10 rounded-full"
                 key={set.setCode}
                 style={{
                   backgroundColor: set.setCode === landingSet?.setCode
-                    ? getSetTheme(set.setCode).accent
-                    : 'rgba(255,255,255,0.22)',
+                    ? '#f4b860'
+                    : 'rgba(244, 184, 96, 0.32)',
                 }}
               />
             ))}
