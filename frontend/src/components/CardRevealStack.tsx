@@ -1,5 +1,4 @@
 import { formatCardPrice } from '../cardPrice';
-import { cardDetailLabels } from '../cardLabels';
 import type { CardDto } from '../types/pack';
 
 type CardRevealStackProps = {
@@ -20,7 +19,6 @@ export function CardRevealStack({ cards, isFastMode, onSelectCard, totalCards }:
   const currentCard = cards.length > 0 ? cards[cards.length - 1] : null;
   const stackedCards = cards.slice(Math.max(cards.length - 5, 0), -1);
   const isMythicReveal = currentCard?.rarity === 'mythic';
-  const currentCardLabels = currentCard ? cardDetailLabels(currentCard) : [];
 
   return (
     <section className="relative flex min-h-[34rem] items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.16),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] px-6 py-10 shadow-card">
@@ -66,11 +64,6 @@ export function CardRevealStack({ cards, isFastMode, onSelectCard, totalCards }:
             />
             <div className="absolute inset-x-4 bottom-4 rounded-md border border-white/10 bg-black/70 px-3 py-2 text-left backdrop-blur">
               <p className="line-clamp-1 text-sm font-semibold text-white">{currentCard.name}</p>
-              {currentCardLabels.length > 0 && (
-                <p className="mt-1 line-clamp-1 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-stone-300">
-                  {currentCardLabels.join(' / ')}
-                </p>
-              )}
               <div className="mt-1 flex items-center justify-between gap-2 text-xs">
                 <span className="font-bold uppercase tracking-[0.16em] text-ember">{currentCard.rarity}</span>
                 <span className="font-semibold text-violet-100">{formatCardPrice(currentCard)}</span>

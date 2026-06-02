@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatCardPrice } from '../cardPrice';
-import { cardDetailLabels } from '../cardLabels';
 import type { CardDto, PackHistoryEntry } from '../types/pack';
 
 type PackHistoryPageProps = {
@@ -194,7 +193,6 @@ export function PackHistoryPage({ entries, onSelectCard }: PackHistoryPageProps)
                           type="button"
                         >
                           <span className="block text-lg font-bold text-white">{bestCard.name}</span>
-                          <CardDetailLine card={bestCard} />
                           <span className="text-sm font-semibold text-violet-100">{formatCardPrice(bestCard)}</span>
                         </button>
                       ) : (
@@ -224,7 +222,6 @@ export function PackHistoryPage({ entries, onSelectCard }: PackHistoryPageProps)
                         <img alt={card.name} className="aspect-[488/680] w-full object-cover" loading="lazy" src={card.imageUrl} />
                         <div className="space-y-1 p-2">
                           <p className="line-clamp-2 min-h-8 text-xs font-semibold leading-4 text-white">{card.name}</p>
-                          <CardDetailLine card={card} compact />
                           <div className="flex items-center justify-between gap-2 text-[0.68rem]">
                             <span className="font-bold uppercase tracking-[0.12em] text-stone-400">{card.rarity}</span>
                             <span className="font-semibold text-violet-100">{formatCardPrice(card)}</span>
@@ -240,19 +237,6 @@ export function PackHistoryPage({ entries, onSelectCard }: PackHistoryPageProps)
         })
       )}
     </section>
-  );
-}
-
-function CardDetailLine({ card, compact = false }: { card: CardDto; compact?: boolean }) {
-  const detailLabels = cardDetailLabels(card);
-  if (detailLabels.length === 0) {
-    return null;
-  }
-
-  return (
-    <span className={`${compact ? 'line-clamp-1 text-[0.62rem]' : 'mt-1 block text-xs'} font-bold uppercase tracking-[0.1em] text-stone-400`}>
-      {detailLabels.join(' / ')}
-    </span>
   );
 }
 

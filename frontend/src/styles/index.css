@@ -45,7 +45,7 @@ a {
   pointer-events: none;
   background-image:
     linear-gradient(90deg, transparent 0 23%, rgba(255, 255, 255, 0.08) 23.2%, transparent 23.6%),
-    linear-gradient(90deg, transparent 0 62%, rgba(244, 184, 96, 0.1) 62.2%, transparent 62.6%),
+    linear-gradient(90deg, transparent 0 62%, rgba(255, 255, 255, 0.08) 62.2%, transparent 62.6%),
     linear-gradient(0deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 100% 5.5rem;
   opacity: 0.55;

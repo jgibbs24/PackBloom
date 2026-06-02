@@ -11,7 +11,7 @@ type PackWrapperProps = {
   packTypeLabel?: string;
   set: SupportedSetDto | undefined;
   theme: SetTheme;
-  size?: 'compact' | 'large';
+  size?: 'compact' | 'medium' | 'large';
 };
 
 export function PackWrapper({ boosterType = 'play', packTypeLabel, set, theme, size = 'large' }: PackWrapperProps) {
@@ -25,9 +25,11 @@ export function PackWrapper({ boosterType = 'play', packTypeLabel, set, theme, s
     '--wrapper-text': theme.text,
   } as CSSProperties;
 
-  const sizeClass = size === 'compact'
-    ? 'h-40 w-28 rounded-lg'
-    : 'h-[25rem] w-[14rem] rounded-xl';
+  const sizeClass = {
+    compact: 'h-40 w-28 rounded-lg',
+    large: 'h-[25rem] w-[14rem] rounded-xl',
+    medium: 'h-56 w-40 rounded-xl',
+  }[size];
 
   useEffect(() => {
     setIsImageLoaded(false);
@@ -92,10 +94,10 @@ export function PackWrapper({ boosterType = 'play', packTypeLabel, set, theme, s
             {set?.setCode ?? 'MTG'}
           </p>
           <h3
-            className={`${size === 'compact' ? 'mt-2 text-lg leading-5' : 'mt-3 text-3xl leading-8'} font-black`}
+            className={`${size === 'large' ? 'mt-3 text-3xl leading-8' : 'mt-2 text-lg leading-5'} font-black`}
             style={{ color: 'var(--wrapper-text)' }}
           >
-            {size === 'compact' ? set?.setCode.toUpperCase() ?? 'MTG' : set?.setName ?? 'Magic Pack'}
+            {size === 'large' ? set?.setName ?? 'Magic Pack' : set?.setCode.toUpperCase() ?? 'MTG'}
           </h3>
         </div>
 

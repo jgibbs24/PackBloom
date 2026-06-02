@@ -472,10 +472,10 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
           <div className="landing-foil-sweep absolute inset-0 z-0 opacity-60" />
           <div className="absolute left-6 top-6 z-0 h-12 w-12 border-l border-t border-ember/45 sm:left-8 sm:top-8" />
           <div className="absolute bottom-6 right-6 z-0 h-12 w-12 border-b border-r border-white/25 sm:bottom-8 sm:right-8" />
-          <div className="landing-set-rail absolute bottom-8 left-6 z-0 hidden gap-2 sm:flex">
-            {sets.slice(0, 7).map((set) => (
+          <div className="landing-set-rail absolute bottom-8 left-6 right-6 z-0 hidden gap-2 sm:flex">
+            {sets.map((set) => (
               <span
-                className="h-1.5 w-10 rounded-full bg-white/25"
+                className="h-1.5 flex-1 rounded-full bg-white/25"
                 key={set.setCode}
                 style={{
                   backgroundColor: set.setCode === landingSet?.setCode
@@ -565,9 +565,9 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     <>
       <div className="grid flex-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start" style={themeStyle}>
         <div className="min-w-0">
-          <div className="mb-6 grid gap-5 rounded-lg border border-white/10 bg-white/[0.04] p-5 shadow-card lg:grid-cols-[13rem_minmax(0,1fr)]">
+          <div className="mb-6 grid gap-5 rounded-lg border border-white/10 bg-white/[0.04] p-5 shadow-card lg:grid-cols-[16rem_minmax(0,1fr)]">
             <div className="mx-auto lg:mx-0">
-              <PackWrapper boosterType={selectedBoosterType} set={selectedSet} theme={selectedTheme} size="compact" />
+              <PackWrapper boosterType={selectedBoosterType} set={selectedSet} theme={selectedTheme} size="medium" />
             </div>
             <div className="min-w-0">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
