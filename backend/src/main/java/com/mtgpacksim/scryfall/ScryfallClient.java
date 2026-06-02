@@ -64,7 +64,10 @@ public class ScryfallClient {
                 card.rarity(),
                 imageUrl(card),
                 priceDetails.priceUsd(),
-                priceDetails.available()
+                priceDetails.available(),
+                finishLabel(card.finishes()),
+                treatmentLabel(card),
+                null
         );
     }
 
@@ -86,6 +89,39 @@ public class ScryfallClient {
         return Optional.ofNullable(imageUris.get("normal"))
                 .or(() -> Optional.ofNullable(imageUris.get("large")))
                 .or(() -> Optional.ofNullable(imageUris.get("small")));
+    }
+
+    private String finishLabel(List<String> finishes) {
+        if (finishes == null || finishes.isEmpty()) {
+            return null;
+        }
+        if (finishes.contains("etched")) {
+            return "Etched foil";
+        }
+        if (finishes.contains("foil")) {
+            return "Foil";
+        }
+        if (finishes.contains("nonfoil")) {
+            return "Nonfoil";
+        }
+        return null;
+    }
+
+    private String treatmentLabel(ScryfallCardResponse card) {
+        List<String> frameEffects = card.frameEffects() == null ? List.of() : card.frameEffects();
+        if (frameEffects.contains("showcase")) {
+            return "Showcase";
+        }
+        if (frameEffects.contains("extendedart")) {
+            return "Extended art";
+        }
+        if ("borderless".equals(card.borderColor())) {
+            return "Borderless";
+        }
+        if (Boolean.TRUE.equals(card.fullArt())) {
+            return "Full art";
+        }
+        return null;
     }
 
     static PriceDetails priceUsd(Map<String, String> prices) {

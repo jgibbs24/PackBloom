@@ -43,8 +43,18 @@ class PackDefinitionServiceTest {
             assertThat(collectorDefinition.msrpUsd()).isEqualTo(24.99);
             assertThat(slotCount(collectorDefinition)).isEqualTo(15);
             assertThat(collectorDefinition.slots())
+                    .extracting(PackSlot::name)
+                    .containsExactly(
+                            "foil commons",
+                            "foil uncommons",
+                            "foil rare/mythic",
+                            "extended-art rare/mythic",
+                            "showcase/borderless rare/mythic",
+                            "foil land"
+                    );
+            assertThat(collectorDefinition.slots())
                     .filteredOn(PackSlot::hasAlternatePool)
-                    .hasSize(2)
+                    .hasSize(3)
                     .satisfies(slots -> assertThat(slots.stream().mapToInt(PackSlot::count).sum()).isEqualTo(5));
         }
     }

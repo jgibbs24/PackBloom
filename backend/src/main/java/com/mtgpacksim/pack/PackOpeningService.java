@@ -54,7 +54,7 @@ public class PackOpeningService {
 
     private List<CardDto> drawSlot(PackSlot slot) {
         if (!slot.hasAlternatePool()) {
-            return drawCards(slot.cacheKey(), slot.query(), slot.count());
+            return drawCards(slot.cacheKey(), slot.query(), slot.count(), slot.name());
         }
 
         List<CardDto> cards = new ArrayList<>();
@@ -62,18 +62,20 @@ public class PackOpeningService {
             boolean useAlternatePool = ThreadLocalRandom.current().nextDouble() < slot.alternateChance();
             String cacheKey = useAlternatePool ? slot.alternateCacheKey() : slot.cacheKey();
             String query = useAlternatePool ? slot.alternateQuery() : slot.query();
-            cards.addAll(drawCards(cacheKey, query, 1));
+            cards.addAll(drawCards(cacheKey, query, 1, slot.name()));
         }
         return cards;
     }
 
-    private List<CardDto> drawCards(String cacheKey, String query, int count) {
+    private List<CardDto> drawCards(String cacheKey, String query, int count, String slotName) {
         List<CardDto> pool = new ArrayList<>(cardPool(cacheKey, query));
         if (pool.size() < count) {
             throw new PackOpeningException("Not enough cards were available for pack slot: " + cacheKey);
         }
         Collections.shuffle(pool);
-        return pool.subList(0, count);
+        return pool.subList(0, count).stream()
+                .map(card -> card.withSlot(slotName))
+                .toList();
     }
 
     private void warmUpSlot(PackSlot slot) {

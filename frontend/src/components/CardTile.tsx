@@ -1,4 +1,5 @@
 import { formatCardPrice } from '../cardPrice';
+import { cardDetailLabels } from '../cardLabels';
 import type { CardDto } from '../types/pack';
 
 type CardTileProps = {
@@ -21,6 +22,8 @@ const rarityBorderStyles: Record<string, string> = {
 };
 
 export function CardTile({ card, onSelect }: CardTileProps) {
+  const detailLabels = cardDetailLabels(card);
+
   return (
     <button
       aria-label={`View ${card.name}`}
@@ -38,6 +41,15 @@ export function CardTile({ card, onSelect }: CardTileProps) {
       </div>
       <div className="space-y-2 p-3">
         <h3 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-white">{card.name}</h3>
+        {detailLabels.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {detailLabels.map((label) => (
+              <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-stone-300" key={label}>
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className={`font-bold uppercase tracking-[0.16em] ${rarityStyles[card.rarity] ?? 'text-stone-300'}`}>
             {card.rarity}

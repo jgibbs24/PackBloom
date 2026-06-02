@@ -5,6 +5,9 @@ export type CardDto = {
   imageUrl: string;
   priceUsd: number;
   priceAvailable?: boolean;
+  finish?: string | null;
+  treatment?: string | null;
+  slot?: string | null;
 };
 
 export type OpenedPackDto = {

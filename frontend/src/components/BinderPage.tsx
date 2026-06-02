@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { formatCardPrice } from '../cardPrice';
+import { cardDetailLabels } from '../cardLabels';
 import type { CardDto, PackHistoryEntry } from '../types/pack';
 
 type BinderPageProps = {
@@ -119,6 +120,7 @@ export function BinderPage({ cards, packHistory, onSelectCard }: BinderPageProps
               </div>
               <div className="space-y-2 p-3">
                 <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-white">{record.card.name}</p>
+                <CardDetailBadges card={record.card} />
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <span className="font-bold uppercase tracking-[0.12em] text-stone-400">{record.setCode}</span>
                   <span className="font-bold text-violet-100">{formatCardPrice(record.card)}</span>
@@ -259,6 +261,7 @@ export function BinderPage({ cards, packHistory, onSelectCard }: BinderPageProps
                   <h3 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-white">
                     {entry.bestCopy.card.name}
                   </h3>
+                  <CardDetailBadges card={entry.bestCopy.card} />
                   <div className="flex items-center justify-between gap-2 text-xs">
                     <span className="font-bold uppercase tracking-[0.16em] text-stone-300">{entry.bestCopy.card.rarity}</span>
                     <span className="rounded bg-amethyst/20 px-2 py-1 font-semibold text-violet-100">
@@ -276,6 +279,23 @@ export function BinderPage({ cards, packHistory, onSelectCard }: BinderPageProps
         )}
       </div>
     </section>
+  );
+}
+
+function CardDetailBadges({ card }: { card: CardDto }) {
+  const detailLabels = cardDetailLabels(card);
+  if (detailLabels.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {detailLabels.map((label) => (
+        <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-stone-300" key={label}>
+          {label}
+        </span>
+      ))}
+    </div>
   );
 }
 

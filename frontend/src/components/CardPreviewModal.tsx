@@ -1,4 +1,5 @@
 import { formatCardPrice } from '../cardPrice';
+import { cardDetailLabels } from '../cardLabels';
 import type { CardDto } from '../types/pack';
 
 type CardPreviewModalProps = {
@@ -7,6 +8,8 @@ type CardPreviewModalProps = {
 };
 
 export function CardPreviewModal({ card, onClose }: CardPreviewModalProps) {
+  const detailLabels = cardDetailLabels(card);
+
   return (
     <div
       aria-modal="true"
@@ -29,6 +32,15 @@ export function CardPreviewModal({ card, onClose }: CardPreviewModalProps) {
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-ember">{card.rarity}</p>
             <h2 className="mt-2 text-3xl font-bold text-white">{card.name}</h2>
+            {detailLabels.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {detailLabels.map((label) => (
+                  <span className="rounded bg-white/[0.06] px-2 py-1 text-xs font-bold uppercase tracking-[0.12em] text-stone-300" key={label}>
+                    {label}
+                  </span>
+                ))}
+              </div>
+            )}
             <p className="mt-4 text-2xl font-semibold text-violet-100">{formatCardPrice(card)}</p>
           </div>
           <button

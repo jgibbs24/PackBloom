@@ -108,26 +108,35 @@ public class PackDefinitionService {
                 "collector",
                 DEFAULT_COLLECTOR_BOOSTER_MSRP_USD,
                 List.of(
-                        PackSlot.fixed("commons", 5, cacheKey(setCode, "collector-common"), query(setCode, "rarity:common is:booster -type:basic")),
-                        PackSlot.fixed("uncommons", 4, cacheKey(setCode, "collector-uncommon"), query(setCode, "rarity:uncommon is:booster")),
+                        PackSlot.fixed("foil commons", 5, cacheKey(setCode, "collector-common"), query(setCode, "rarity:common is:booster -type:basic")),
+                        PackSlot.fixed("foil uncommons", 4, cacheKey(setCode, "collector-uncommon"), query(setCode, "rarity:uncommon is:booster")),
                         PackSlot.rareOrMythic(
-                                "rare-or-mythic-slots",
-                                4,
-                                cacheKey(setCode, "collector-rare"),
-                                query(setCode, "rarity:rare is:booster"),
-                                cacheKey(setCode, "collector-mythic"),
-                                query(setCode, "rarity:mythic is:booster"),
+                                "foil rare/mythic",
+                                cacheKey(setCode, "collector-foil-rare"),
+                                query(setCode, "rarity:rare is:booster -frame:extendedart -frame:showcase -border:borderless"),
+                                cacheKey(setCode, "collector-foil-mythic"),
+                                query(setCode, "rarity:mythic is:booster -frame:extendedart -frame:showcase -border:borderless"),
                                 COLLECTOR_MYTHIC_CHANCE
                         ),
                         PackSlot.rareOrMythic(
-                                "rare-or-mythic-wildcard",
-                                cacheKey(setCode, "collector-rare"),
-                                query(setCode, "rarity:rare is:booster"),
-                                cacheKey(setCode, "collector-mythic"),
-                                query(setCode, "rarity:mythic is:booster"),
+                                "extended-art rare/mythic",
+                                2,
+                                cacheKey(setCode, "collector-extended-art-rare"),
+                                query(setCode, "rarity:rare is:booster frame:extendedart"),
+                                cacheKey(setCode, "collector-extended-art-mythic"),
+                                query(setCode, "rarity:mythic is:booster frame:extendedart"),
                                 COLLECTOR_WILDCARD_MYTHIC_CHANCE
                         ),
-                        PackSlot.fixed("land", 1, cacheKey(setCode, "collector-land"), query(setCode, "type:basic"))
+                        PackSlot.rareOrMythic(
+                                "showcase/borderless rare/mythic",
+                                2,
+                                cacheKey(setCode, "collector-showcase-borderless-rare"),
+                                query(setCode, "rarity:rare is:booster (frame:showcase or border:borderless)"),
+                                cacheKey(setCode, "collector-showcase-borderless-mythic"),
+                                query(setCode, "rarity:mythic is:booster (frame:showcase or border:borderless)"),
+                                COLLECTOR_WILDCARD_MYTHIC_CHANCE
+                        ),
+                        PackSlot.fixed("foil land", 1, cacheKey(setCode, "collector-land"), query(setCode, "type:basic"))
                 )
         );
     }

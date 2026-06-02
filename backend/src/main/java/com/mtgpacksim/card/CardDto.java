@@ -8,6 +8,12 @@ public record CardDto(
         String rarity,
         String imageUrl,
         BigDecimal priceUsd,
-        boolean priceAvailable
+        boolean priceAvailable,
+        String finish,
+        String treatment,
+        String slot
 ) {
+    public CardDto withSlot(String slot) {
+        return new CardDto(id, name, rarity, imageUrl, priceUsd, priceAvailable, finish, treatment, slot);
+    }
 }

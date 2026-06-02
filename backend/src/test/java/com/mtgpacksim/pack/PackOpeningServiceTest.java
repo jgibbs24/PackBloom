@@ -53,6 +53,16 @@ class PackOpeningServiceTest {
         assertThat(pack.cards())
                 .filteredOn(card -> card.rarity().equals("rare") || card.rarity().equals("mythic"))
                 .hasSize(5);
+        assertThat(pack.cards())
+                .extracting(CardDto::slot)
+                .contains(
+                        "foil commons",
+                        "foil uncommons",
+                        "foil rare/mythic",
+                        "extended-art rare/mythic",
+                        "showcase/borderless rare/mythic",
+                        "foil land"
+                );
     }
 
     @Test
@@ -71,8 +81,12 @@ class PackOpeningServiceTest {
 
         verify(scryfallClient).searchCards("set:blb rarity:common is:booster -type:basic");
         verify(scryfallClient).searchCards("set:blb rarity:uncommon is:booster");
-        verify(scryfallClient).searchCards("set:blb rarity:rare is:booster");
-        verify(scryfallClient).searchCards("set:blb rarity:mythic is:booster");
+        verify(scryfallClient).searchCards("set:blb rarity:rare is:booster -frame:extendedart -frame:showcase -border:borderless");
+        verify(scryfallClient).searchCards("set:blb rarity:mythic is:booster -frame:extendedart -frame:showcase -border:borderless");
+        verify(scryfallClient).searchCards("set:blb rarity:rare is:booster frame:extendedart");
+        verify(scryfallClient).searchCards("set:blb rarity:mythic is:booster frame:extendedart");
+        verify(scryfallClient).searchCards("set:blb rarity:rare is:booster (frame:showcase or border:borderless)");
+        verify(scryfallClient).searchCards("set:blb rarity:mythic is:booster (frame:showcase or border:borderless)");
         verify(scryfallClient).searchCards("set:blb type:basic");
     }
 
@@ -97,7 +111,10 @@ class PackOpeningServiceTest {
                         rarity,
                         "https://example.com/" + rarity + "-" + index + ".jpg",
                         BigDecimal.ONE,
-                        true
+                        true,
+                        "Foil",
+                        null,
+                        null
                 ))
                 .toList();
     }
