@@ -28,15 +28,21 @@ a {
   inset: 4%;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 22%, rgba(255, 184, 61, 0.95) 0 1.4%, rgba(255, 149, 0, 0.55) 1.8%, transparent 4%),
-    radial-gradient(circle at 34% 35%, rgba(255, 211, 118, 0.9) 0 1%, rgba(255, 149, 0, 0.5) 1.4%, transparent 3.2%),
-    radial-gradient(circle at 72% 27%, rgba(255, 184, 61, 0.95) 0 1.7%, rgba(255, 149, 0, 0.55) 2.2%, transparent 5%),
-    radial-gradient(circle at 82% 62%, rgba(255, 211, 118, 0.95) 0 1.2%, rgba(255, 149, 0, 0.48) 1.8%, transparent 4%),
-    radial-gradient(circle at 27% 75%, rgba(255, 184, 61, 0.9) 0 1.2%, rgba(255, 149, 0, 0.45) 1.8%, transparent 4%),
-    conic-gradient(from 0deg at 18% 22%, transparent 0 10deg, rgba(255, 149, 0, 0.9) 10deg 12deg, transparent 12deg 88deg, rgba(255, 149, 0, 0.9) 88deg 90deg, transparent 90deg 178deg, rgba(255, 149, 0, 0.9) 178deg 180deg, transparent 180deg 268deg, rgba(255, 149, 0, 0.9) 268deg 270deg, transparent 270deg),
-    conic-gradient(from 0deg at 72% 27%, transparent 0 8deg, rgba(255, 179, 56, 0.85) 8deg 11deg, transparent 11deg 86deg, rgba(255, 179, 56, 0.85) 86deg 89deg, transparent 89deg 176deg, rgba(255, 179, 56, 0.85) 176deg 179deg, transparent 179deg 266deg, rgba(255, 179, 56, 0.85) 266deg 269deg, transparent 269deg),
-    conic-gradient(from 0deg at 82% 62%, transparent 0 8deg, rgba(255, 149, 0, 0.8) 8deg 10deg, transparent 10deg 88deg, rgba(255, 149, 0, 0.8) 88deg 90deg, transparent 90deg 178deg, rgba(255, 149, 0, 0.8) 178deg 180deg, transparent 180deg 268deg, rgba(255, 149, 0, 0.8) 268deg 270deg, transparent 270deg);
-  filter: drop-shadow(0 0 9px rgba(255, 149, 0, 0.82));
+    radial-gradient(circle at 50% 50%, rgba(255, 190, 72, 0.34) 0 8%, transparent 24%),
+    radial-gradient(circle at 16% 22%, rgba(255, 199, 82, 0.95) 0 0.65rem, rgba(255, 128, 0, 0.38) 0.9rem, transparent 1.65rem),
+    radial-gradient(circle at 31% 13%, rgba(255, 225, 130, 0.9) 0 0.35rem, rgba(255, 128, 0, 0.4) 0.58rem, transparent 1.2rem),
+    radial-gradient(circle at 70% 17%, rgba(255, 207, 92, 0.96) 0 0.45rem, rgba(255, 145, 0, 0.45) 0.72rem, transparent 1.35rem),
+    radial-gradient(circle at 86% 31%, rgba(255, 178, 45, 0.96) 0 0.52rem, rgba(255, 145, 0, 0.42) 0.8rem, transparent 1.45rem),
+    radial-gradient(circle at 92% 58%, rgba(255, 214, 109, 0.94) 0 0.38rem, rgba(255, 145, 0, 0.42) 0.62rem, transparent 1.2rem),
+    radial-gradient(circle at 75% 80%, rgba(255, 184, 61, 0.95) 0 0.46rem, rgba(255, 128, 0, 0.4) 0.72rem, transparent 1.35rem),
+    radial-gradient(circle at 52% 90%, rgba(255, 225, 130, 0.9) 0 0.28rem, rgba(255, 128, 0, 0.36) 0.48rem, transparent 1rem),
+    radial-gradient(circle at 29% 82%, rgba(255, 178, 45, 0.95) 0 0.4rem, rgba(255, 145, 0, 0.38) 0.65rem, transparent 1.25rem),
+    radial-gradient(circle at 12% 61%, rgba(255, 214, 109, 0.94) 0 0.32rem, rgba(255, 145, 0, 0.36) 0.54rem, transparent 1.12rem),
+    radial-gradient(circle at 39% 40%, rgba(255, 184, 61, 0.86) 0 0.28rem, transparent 0.95rem),
+    radial-gradient(circle at 62% 39%, rgba(255, 214, 109, 0.86) 0 0.32rem, transparent 1rem),
+    radial-gradient(circle at 42% 68%, rgba(255, 199, 82, 0.88) 0 0.26rem, transparent 0.9rem),
+    radial-gradient(circle at 63% 67%, rgba(255, 178, 45, 0.88) 0 0.3rem, transparent 0.95rem);
+  filter: drop-shadow(0 0 10px rgba(255, 149, 0, 0.72));
   opacity: 0;
   animation: mythic-reveal-burst 1100ms ease-out forwards;
 }

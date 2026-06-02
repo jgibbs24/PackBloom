@@ -1,7 +1,7 @@
 import type { BoosterType } from './packLabels';
 import type { CardDto, PackHistoryEntry, SessionStats } from './types/pack';
 
-export type PersistedActiveView = 'opener' | 'binder' | 'history' | 'stats';
+export type PersistedActiveView = 'opener' | 'binder' | 'history';
 
 export type PersistedSessionState = {
   activeView: PersistedActiveView;
@@ -46,7 +46,7 @@ export function loadPersistedSession(): PersistedSessionState | null {
     }
 
     return {
-      activeView: parsedSession.activeView,
+      activeView: isPersistedActiveView(parsedSession.activeView) ? parsedSession.activeView : 'opener',
       allPulledCards: parsedSession.allPulledCards ?? parsedSession.binderCards ?? [],
       binderCards: parsedSession.binderCards ?? [],
       boosterTypesBySetCode: parsedSession.boosterTypesBySetCode ?? {},
@@ -74,4 +74,8 @@ export function savePersistedSession(session: PersistedSessionState) {
 
 export function clearPersistedSession() {
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+function isPersistedActiveView(activeView: unknown): activeView is PersistedActiveView {
+  return activeView === 'opener' || activeView === 'binder' || activeView === 'history';
 }

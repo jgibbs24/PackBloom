@@ -96,7 +96,7 @@ export function BinderPage({ cards, packHistory, onSelectCard }: BinderPageProps
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {bestPulls.map((record, index) => (
             <button
               aria-label={`View ${record.card.name}`}
@@ -116,9 +116,9 @@ export function BinderPage({ cards, packHistory, onSelectCard }: BinderPageProps
                   #{index + 1}
                 </span>
               </div>
-              <div className="space-y-1 p-2">
-                <p className="line-clamp-2 min-h-8 text-xs font-semibold leading-4 text-white">{record.card.name}</p>
-                <div className="flex items-center justify-between gap-1 text-[0.68rem]">
+              <div className="space-y-2 p-3">
+                <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-white">{record.card.name}</p>
+                <div className="flex items-center justify-between gap-2 text-xs">
                   <span className="font-bold uppercase tracking-[0.12em] text-stone-400">{record.setCode}</span>
                   <span className="font-bold text-violet-100">${record.card.priceUsd.toFixed(2)}</span>
                 </div>

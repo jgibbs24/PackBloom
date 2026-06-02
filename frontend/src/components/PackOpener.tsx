@@ -8,7 +8,6 @@ import { clearPersistedSession, loadPersistedSession, savePersistedSession } fro
 import { getSetTheme } from '../setThemes';
 import { FALLBACK_SUPPORTED_SETS } from '../supportedSets';
 import type { CardDto, OpenedPackDto, PackHistoryEntry, SessionStats, SupportedSetDto } from '../types/pack';
-import { AdvancedStatsPage } from './AdvancedStatsPage';
 import { BinderPage } from './BinderPage';
 import { CardGrid } from './CardGrid';
 import { CardPreviewModal } from './CardPreviewModal';
@@ -29,7 +28,7 @@ const LANDING_FALLBACK_SET: SupportedSetDto = {
 };
 type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
-type ActiveView = 'opener' | 'binder' | 'history' | 'stats';
+type ActiveView = 'opener' | 'binder' | 'history';
 type EngineStatus = 'checking' | 'ready' | 'waking' | 'unavailable';
 export type AppStep = 'start' | 'select-set' | 'open-pack';
 
@@ -634,7 +633,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                 {revealMode === 'one-by-one' && pack && revealPhase === 'revealing' && (
                   <>
                     <button
-                      className="rounded-md border border-ember/40 px-4 py-2 text-sm font-semibold text-ember transition hover:border-ember hover:bg-ember/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="min-w-52 rounded-md border border-ember/40 px-4 py-2 text-sm font-semibold text-ember transition hover:border-ember hover:bg-ember/10 disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={!canAdvanceReveal}
                       onClick={() => {
                         if (revealedCount >= pack.cards.length) {
@@ -716,21 +715,12 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
             >
               History
             </button>
-            <button
-              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${activeView === 'stats' ? 'bg-ember text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
-              onClick={() => setActiveView('stats')}
-              type="button"
-            >
-              Stats
-            </button>
           </div>
 
           {activeView === 'binder' ? (
             <BinderPage cards={allPulledCards} packHistory={packHistory} onSelectCard={setSelectedCard} />
           ) : activeView === 'history' ? (
             <PackHistoryPage entries={packHistory} onSelectCard={setSelectedCard} />
-          ) : activeView === 'stats' ? (
-            <AdvancedStatsPage entries={packHistory} stats={sessionStats} />
           ) : isOpeningWrapper ? (
             <section className="relative flex min-h-[28rem] items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[radial-gradient(circle_at_center,rgba(244,184,96,0.14),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] px-6 py-10 shadow-card">
               <div className="absolute inset-x-10 top-10 h-px bg-gradient-to-r from-transparent via-ember/50 to-transparent" />
