@@ -147,8 +147,6 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
           return;
         }
 
-        const message = caughtError instanceof Error ? caughtError.message : 'Unable to load supported sets.';
-        setError(message);
         setSets((currentSets) => (currentSets.length > 0 ? currentSets : FALLBACK_SUPPORTED_SETS));
         setEngineStatus('waking');
         retryTimeoutId = window.setTimeout(() => {
@@ -255,7 +253,6 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
 
   async function handleOpenPack() {
     if (!isEngineReady) {
-      setError('The pack engine is still waking up. Try opening a pack again in a moment.');
       return;
     }
 
@@ -422,7 +419,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
           selectedSetCode={selectedSetCode}
           sets={sets}
         />
-        {error && (
+        {engineStatus === 'ready' && error && (
           <div className="mt-6 rounded-md border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             {error}
           </div>
@@ -598,7 +595,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
             </div>
           </div>
 
-          {error && (
+          {engineStatus === 'ready' && error && (
             <div className="mb-6 rounded-md border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
               {error}
             </div>
