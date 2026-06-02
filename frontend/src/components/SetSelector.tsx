@@ -5,6 +5,8 @@ import { PackWrapper } from './PackWrapper';
 
 type SetSelectorProps = {
   boosterTypesBySetCode: Record<string, BoosterType>;
+  continueLabel?: string;
+  modeLabel?: string;
   sets: SupportedSetDto[];
   selectedSetCode: string;
   isLoading: boolean;
@@ -16,9 +18,11 @@ type SetSelectorProps = {
 
 export function SetSelector({
   boosterTypesBySetCode,
+  continueLabel = 'Continue',
   sets,
   selectedSetCode,
   isLoading,
+  modeLabel = 'Choose set',
   onContinue,
   onBoosterTypeChange,
   onBack,
@@ -38,7 +42,7 @@ export function SetSelector({
             Back
           </button>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-ember">Choose set</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-ember">{modeLabel}</p>
             <h2 className="mt-2 text-3xl font-bold text-white sm:text-4xl">Pick Your Pack</h2>
           </div>
         </div>
@@ -48,7 +52,7 @@ export function SetSelector({
           onClick={onContinue}
           type="button"
         >
-          Continue
+          {continueLabel}
         </button>
       </div>
 

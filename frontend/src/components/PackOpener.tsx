@@ -14,6 +14,8 @@ import { BinderPage } from './BinderPage';
 import { CardGrid } from './CardGrid';
 import { CardPreviewModal } from './CardPreviewModal';
 import { CardRevealStack } from './CardRevealStack';
+import { ModeSelector } from './ModeSelector';
+import { PackBattlePage } from './PackBattlePage';
 import { PackHistoryPage } from './PackHistoryPage';
 import { PackSummary } from './PackSummary';
 import { PackWrapper } from './PackWrapper';
@@ -32,7 +34,8 @@ type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
 type ActiveView = 'opener' | 'binder' | 'history';
 type EngineStatus = 'checking' | 'ready' | 'waking' | 'unavailable';
-export type AppStep = 'start' | 'select-set' | 'open-pack';
+export type AppMode = 'opener' | 'battle';
+export type AppStep = 'start' | 'select-mode' | 'select-set' | 'open-pack' | 'pack-battle';
 
 type PackOpenerProps = {
   appStep: AppStep;
@@ -54,6 +57,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const persistedSession = useMemo(() => loadPersistedSession(), []);
   const [sets, setSets] = useState<SupportedSetDto[]>(FALLBACK_SUPPORTED_SETS);
   const [selectedSetCode, setSelectedSetCode] = useState(persistedSession?.selectedSetCode ?? DEFAULT_SET_CODE);
+  const [selectedMode, setSelectedMode] = useState<AppMode>('opener');
   const [pack, setPack] = useState<OpenedPackDto | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('checking');
@@ -304,6 +308,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     setIsAudioSettingsOpen(false);
     setIsMusicEnabled(false);
     setIsSfxEnabled(true);
+    setSelectedMode('opener');
     setBoosterTypesBySetCode({});
     setSelectedSetCode(sets[0]?.setCode ?? DEFAULT_SET_CODE);
     setAppStep('start');
@@ -500,7 +505,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                 <button
                   className="rounded-md bg-ember px-6 py-3 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
                   disabled={!canStartOpeningFlow}
-                  onClick={() => setAppStep('select-set')}
+                  onClick={() => setAppStep('select-mode')}
                   type="button"
                 >
                   Play
@@ -544,15 +549,31 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       </>
     );
   }
+  if (appStep === 'select-mode') {
+    return (
+      <>
+        <ModeSelector
+          onBack={() => setAppStep('start')}
+          onSelectMode={(mode) => {
+            setSelectedMode(mode);
+            setAppStep('select-set');
+          }}
+        />
+        {audioControls}
+      </>
+    );
+  }
   if (appStep === 'select-set') {
     return (
       <>
         <SetSelector
           boosterTypesBySetCode={boosterTypesBySetCode}
           isLoading={false}
-          onBack={() => setAppStep('start')}
+          continueLabel={selectedMode === 'battle' ? 'Start Battle' : 'Start Opening'}
+          modeLabel={selectedMode === 'battle' ? 'Pack Battle' : 'Open Packs'}
+          onBack={() => setAppStep('select-mode')}
           onBoosterTypeChange={handleBoosterTypeChange}
-          onContinue={() => setAppStep('open-pack')}
+          onContinue={() => setAppStep(selectedMode === 'battle' ? 'pack-battle' : 'open-pack')}
           onSelectedSetChange={handleSelectedSetChange}
           selectedSetCode={selectedSetCode}
           sets={sets}
@@ -563,6 +584,29 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
           </div>
         )}
         {audioControls}
+      </>
+    );
+  }
+
+  if (appStep === 'pack-battle') {
+    return (
+      <>
+        <PackBattlePage
+          audioVolume={audioVolume}
+          boosterType={selectedBoosterType}
+          canRetryEngine={engineStatus === 'waking' || engineWaitSeconds >= 8}
+          canPlaySfx={canPlaySfx}
+          engineStatusMessage={getEngineStatusMessage(engineStatus, engineWaitSeconds)}
+          isEngineReady={isEngineReady}
+          onChangeSet={() => setAppStep('select-set')}
+          onHome={() => setAppStep('start')}
+          onRetryEngine={() => setEngineRetryKey((currentKey) => currentKey + 1)}
+          onSelectCard={setSelectedCard}
+          selectedSet={selectedSet}
+          theme={selectedTheme}
+        />
+        {audioControls}
+        {selectedCard && <CardPreviewModal card={selectedCard} onClose={() => setSelectedCard(null)} />}
       </>
     );
   }
