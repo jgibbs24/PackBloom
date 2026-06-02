@@ -11,6 +11,7 @@ export type PersistedSessionState = {
   chaseCardName: string;
   isAudioMuted: boolean;
   isAudioEnabled: boolean;
+  audioVolume: number;
   isFastMode: boolean;
   isMusicEnabled: boolean;
   isSfxEnabled: boolean;
@@ -56,6 +57,7 @@ export function loadPersistedSession(): PersistedSessionState | null {
       chaseCardName: parsedSession.chaseCardName ?? '',
       isAudioMuted: parsedSession.isAudioMuted ?? !(parsedSession.isAudioEnabled ?? false),
       isAudioEnabled: parsedSession.isAudioEnabled ?? false,
+      audioVolume: normalizeAudioVolume(parsedSession.audioVolume),
       isFastMode: parsedSession.isFastMode ?? false,
       isMusicEnabled: parsedSession.isMusicEnabled ?? false,
       isSfxEnabled: parsedSession.isSfxEnabled ?? parsedSession.isAudioEnabled ?? true,
@@ -84,4 +86,12 @@ export function clearPersistedSession() {
 
 function isPersistedActiveView(activeView: unknown): activeView is PersistedActiveView {
   return activeView === 'opener' || activeView === 'binder' || activeView === 'history';
+}
+
+function normalizeAudioVolume(audioVolume: unknown): number {
+  if (typeof audioVolume !== 'number' || Number.isNaN(audioVolume)) {
+    return 0.7;
+  }
+
+  return Math.min(Math.max(audioVolume, 0), 1);
 }

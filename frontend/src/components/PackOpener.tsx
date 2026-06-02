@@ -80,6 +80,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const [landingSetIndex, setLandingSetIndex] = useState(0);
   const [isFastMode, setIsFastMode] = useState(persistedSession?.isFastMode ?? false);
   const [isAudioMuted, setIsAudioMuted] = useState(persistedSession?.isAudioMuted ?? !(persistedSession?.isAudioEnabled ?? false));
+  const [audioVolume, setAudioVolume] = useState(persistedSession?.audioVolume ?? 0.7);
   const [isAudioSettingsOpen, setIsAudioSettingsOpen] = useState(false);
   const [isMusicEnabled, setIsMusicEnabled] = useState(persistedSession?.isMusicEnabled ?? false);
   const [isSfxEnabled, setIsSfxEnabled] = useState(persistedSession?.isSfxEnabled ?? persistedSession?.isAudioEnabled ?? true);
@@ -113,6 +114,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       chaseCardName,
       isAudioEnabled: !isAudioMuted && isSfxEnabled,
       isAudioMuted,
+      audioVolume,
       isFastMode,
       isMusicEnabled,
       isSfxEnabled,
@@ -128,6 +130,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     boosterTypesBySetCode,
     chaseCardName,
     isAudioMuted,
+    audioVolume,
     isFastMode,
     isMusicEnabled,
     isSfxEnabled,
@@ -267,12 +270,12 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   }, [isLoading]);
 
   useEffect(() => {
-    syncBackgroundMusic(!isAudioMuted && isMusicEnabled);
+    syncBackgroundMusic(!isAudioMuted && isMusicEnabled, audioVolume);
 
     return () => {
       syncBackgroundMusic(false);
     };
-  }, [isAudioMuted, isMusicEnabled]);
+  }, [audioVolume, isAudioMuted, isMusicEnabled]);
 
   function resetCurrentPack() {
     setPack(null);
@@ -297,6 +300,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     setRevealMode('all');
     setIsFastMode(false);
     setIsAudioMuted(true);
+    setAudioVolume(0.7);
     setIsAudioSettingsOpen(false);
     setIsMusicEnabled(false);
     setIsSfxEnabled(true);
@@ -349,7 +353,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       return;
     }
 
-    playFeedbackSound('pack', canPlaySfx);
+    playFeedbackSound('pack', canPlaySfx, audioVolume);
     setIsLoading(true);
     setIsOpeningWrapper(!isFastMode);
     setError(null);
@@ -403,10 +407,12 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       isMusicEnabled={isMusicEnabled}
       isOpen={isAudioSettingsOpen}
       isSfxEnabled={isSfxEnabled}
+      volume={audioVolume}
       onMuteToggle={() => setIsAudioMuted((currentValue) => !currentValue)}
       onMusicToggle={() => setIsMusicEnabled((currentValue) => !currentValue)}
       onOpenToggle={() => setIsAudioSettingsOpen((currentValue) => !currentValue)}
       onSfxToggle={() => setIsSfxEnabled((currentValue) => !currentValue)}
+      onVolumeChange={setAudioVolume}
     />
   );
 
@@ -424,7 +430,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
 
     if (chasePull) {
       setChaseHitCard(chasePull);
-      playFeedbackSound('mythic', canPlaySfx);
+      playFeedbackSound('mythic', canPlaySfx, audioVolume);
     }
   }
 
@@ -434,7 +440,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     }
 
     const nextCard = pack.cards[revealedCount];
-    playFeedbackSound(nextCard?.rarity === 'mythic' ? 'mythic' : 'flip', canPlaySfx);
+    playFeedbackSound(nextCard?.rarity === 'mythic' ? 'mythic' : 'flip', canPlaySfx, audioVolume);
     setRevealedCount((count) => Math.min(count + 1, pack.cards.length));
   }
 
@@ -879,6 +885,8 @@ function AudioControls({
   onMuteToggle,
   onOpenToggle,
   onSfxToggle,
+  onVolumeChange,
+  volume,
 }: {
   isMuted: boolean;
   isMusicEnabled: boolean;
@@ -888,38 +896,60 @@ function AudioControls({
   onMuteToggle: () => void;
   onOpenToggle: () => void;
   onSfxToggle: () => void;
+  onVolumeChange: (volume: number) => void;
+  volume: number;
 }) {
+  const volumePercent = Math.round(volume * 100);
+
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex items-end gap-2 sm:bottom-7 sm:right-7">
+    <div className="fixed bottom-5 right-5 z-40 sm:bottom-7 sm:right-7">
       {isOpen && (
-        <div className="mb-14 w-48 rounded-lg border border-white/10 bg-stone-900/95 p-3 shadow-card backdrop-blur">
+        <div className="absolute bottom-14 right-0 w-56 rounded-lg border border-white/10 bg-stone-900/95 p-3 shadow-card backdrop-blur">
           <AudioToggle isChecked={isMusicEnabled} label="Music" onToggle={onMusicToggle} />
           <AudioToggle isChecked={isSfxEnabled} label="SFX" onToggle={onSfxToggle} />
+          <label className="mt-3 block rounded-md px-2 py-2 text-sm font-semibold text-stone-200">
+            <span className="flex items-center justify-between">
+              <span>Volume</span>
+              <span className="text-xs font-bold text-ember">{volumePercent}%</span>
+            </span>
+            <input
+              aria-label="Audio volume"
+              className="mt-3 block w-full accent-ember"
+              max="100"
+              min="0"
+              onChange={(event) => onVolumeChange(Number(event.target.value) / 100)}
+              step="5"
+              type="range"
+              value={volumePercent}
+            />
+          </label>
         </div>
       )}
-      <button
-        aria-label="Audio settings"
-        aria-expanded={isOpen}
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-stone-800/90 text-stone-200 shadow-card backdrop-blur transition hover:-translate-y-0.5 hover:border-ember hover:text-ember focus:outline-none focus:ring-2 focus:ring-ember/70"
-        onClick={onOpenToggle}
-        title="Audio settings"
-        type="button"
-      >
-        <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
-          <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-          <path d="M8 7h.01M14 12h.01M11 17h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="4" />
-        </svg>
-      </button>
-      <button
-        aria-label={isMuted ? 'Unmute audio' : 'Mute audio'}
-        aria-pressed={isMuted}
-        className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-stone-800/90 text-white shadow-card backdrop-blur transition hover:-translate-y-0.5 hover:border-ember hover:text-ember focus:outline-none focus:ring-2 focus:ring-ember/70"
-        onClick={onMuteToggle}
-        title={isMuted ? 'Unmute audio' : 'Mute audio'}
-        type="button"
-      >
-        <SpeakerIcon isMuted={isMuted} />
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          aria-label="Audio settings"
+          aria-expanded={isOpen}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-stone-800/90 text-stone-200 shadow-card backdrop-blur transition hover:-translate-y-0.5 hover:border-ember hover:text-ember focus:outline-none focus:ring-2 focus:ring-ember/70"
+          onClick={onOpenToggle}
+          title="Audio settings"
+          type="button"
+        >
+          <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+            <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+            <path d="M8 7h.01M14 12h.01M11 17h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="4" />
+          </svg>
+        </button>
+        <button
+          aria-label={isMuted ? 'Unmute audio' : 'Mute audio'}
+          aria-pressed={isMuted}
+          className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-stone-800/90 text-white shadow-card backdrop-blur transition hover:-translate-y-0.5 hover:border-ember hover:text-ember focus:outline-none focus:ring-2 focus:ring-ember/70"
+          onClick={onMuteToggle}
+          title={isMuted ? 'Unmute audio' : 'Mute audio'}
+          type="button"
+        >
+          <SpeakerIcon isMuted={isMuted} />
+        </button>
+      </div>
     </div>
   );
 }
