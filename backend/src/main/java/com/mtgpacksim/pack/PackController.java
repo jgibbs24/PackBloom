@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @RequestMapping("/api/packs")
 public class PackController {
-    private static final Duration PACK_OPENING_TIMEOUT = Duration.ofSeconds(25);
+    private static final Duration PACK_OPENING_TIMEOUT = Duration.ofSeconds(75);
 
     private final PackOpeningService packOpeningService;
 
