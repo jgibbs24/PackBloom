@@ -11,6 +11,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -66,6 +67,32 @@ class PackOpeningServiceTest {
     }
 
     @Test
+    void collectorBoosterFallsBackWhenSpecialTreatmentPoolsAreEmpty() {
+        when(scryfallClient.searchCards(eq("set:blb rarity:rare is:booster frame:extendedart")))
+                .thenReturn(List.of());
+        when(scryfallClient.searchCards(eq("set:blb rarity:mythic is:booster frame:extendedart")))
+                .thenReturn(List.of());
+        when(scryfallClient.searchCards(eq("set:blb rarity:rare is:booster (frame:showcase or border:borderless)")))
+                .thenReturn(List.of());
+        when(scryfallClient.searchCards(eq("set:blb rarity:mythic is:booster (frame:showcase or border:borderless)")))
+                .thenReturn(List.of());
+        when(scryfallClient.searchCards(eq("set:blb rarity:rare is:booster")))
+                .thenReturn(cards("rare", 30));
+        when(scryfallClient.searchCards(eq("set:blb rarity:mythic is:booster")))
+                .thenReturn(cards("mythic", 30));
+
+        OpenedPackDto pack = service.openPack("blb", "collector");
+
+        assertThat(pack.cards()).hasSize(15);
+        assertThat(pack.cards())
+                .filteredOn(card -> card.slot().equals("extended-art rare/mythic"))
+                .hasSize(2);
+        assertThat(pack.cards())
+                .filteredOn(card -> card.slot().equals("showcase/borderless rare/mythic"))
+                .hasSize(2);
+    }
+
+    @Test
     void reusesLoadedCardPoolsAcrossPackOpenings() {
         service.openPack("blb", "play");
         service.openPack("blb", "play");
@@ -87,6 +114,8 @@ class PackOpeningServiceTest {
         verify(scryfallClient).searchCards("set:blb rarity:mythic is:booster frame:extendedart");
         verify(scryfallClient).searchCards("set:blb rarity:rare is:booster (frame:showcase or border:borderless)");
         verify(scryfallClient).searchCards("set:blb rarity:mythic is:booster (frame:showcase or border:borderless)");
+        verify(scryfallClient).searchCards("set:blb rarity:rare is:booster");
+        verify(scryfallClient).searchCards("set:blb rarity:mythic is:booster");
         verify(scryfallClient).searchCards("set:blb type:basic");
     }
 

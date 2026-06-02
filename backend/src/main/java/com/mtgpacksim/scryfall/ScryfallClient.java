@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -50,6 +51,9 @@ public class ScryfallClient {
                     .map(this::toCardDto)
                     .filter(card -> card.imageUrl() != null && !card.imageUrl().isBlank())
                     .toList();
+        } catch (HttpClientErrorException.NotFound exception) {
+            LOGGER.info("Scryfall returned no cards for query '{}'. URL: {}", query, uri);
+            return List.of();
         } catch (RestClientException exception) {
             LOGGER.error("Scryfall request failed for query '{}'. URL: {}", query, uri, exception);
             throw new ScryfallException("Scryfall is temporarily unavailable while loading cards for query: " + query, exception);

@@ -54,7 +54,14 @@ public class PackOpeningService {
 
     private List<CardDto> drawSlot(PackSlot slot) {
         if (!slot.hasAlternatePool()) {
-            return drawCards(slot.cacheKey(), slot.query(), slot.count(), slot.name());
+            return drawCards(
+                    slot.cacheKey(),
+                    slot.query(),
+                    slot.fallbackCacheKey(),
+                    slot.fallbackQuery(),
+                    slot.count(),
+                    slot.name()
+            );
         }
 
         List<CardDto> cards = new ArrayList<>();
@@ -62,13 +69,26 @@ public class PackOpeningService {
             boolean useAlternatePool = ThreadLocalRandom.current().nextDouble() < slot.alternateChance();
             String cacheKey = useAlternatePool ? slot.alternateCacheKey() : slot.cacheKey();
             String query = useAlternatePool ? slot.alternateQuery() : slot.query();
-            cards.addAll(drawCards(cacheKey, query, 1, slot.name()));
+            String fallbackCacheKey = useAlternatePool ? slot.alternateFallbackCacheKey() : slot.fallbackCacheKey();
+            String fallbackQuery = useAlternatePool ? slot.alternateFallbackQuery() : slot.fallbackQuery();
+            cards.addAll(drawCards(cacheKey, query, fallbackCacheKey, fallbackQuery, 1, slot.name()));
         }
         return cards;
     }
 
-    private List<CardDto> drawCards(String cacheKey, String query, int count, String slotName) {
+    private List<CardDto> drawCards(
+            String cacheKey,
+            String query,
+            String fallbackCacheKey,
+            String fallbackQuery,
+            int count,
+            String slotName
+    ) {
         List<CardDto> pool = new ArrayList<>(cardPool(cacheKey, query));
+        if (pool.size() < count && fallbackCacheKey != null && fallbackQuery != null) {
+            LOGGER.info("Using fallback Scryfall card pool '{}' for slot '{}'.", fallbackCacheKey, slotName);
+            pool = new ArrayList<>(cardPool(fallbackCacheKey, fallbackQuery));
+        }
         if (pool.size() < count) {
             throw new PackOpeningException("Not enough cards were available for pack slot: " + cacheKey);
         }
@@ -80,8 +100,14 @@ public class PackOpeningService {
 
     private void warmUpSlot(PackSlot slot) {
         cardPool(slot.cacheKey(), slot.query());
+        if (slot.hasFallbackPool()) {
+            cardPool(slot.fallbackCacheKey(), slot.fallbackQuery());
+        }
         if (slot.hasAlternatePool()) {
             cardPool(slot.alternateCacheKey(), slot.alternateQuery());
+            if (slot.hasAlternateFallbackPool()) {
+                cardPool(slot.alternateFallbackCacheKey(), slot.alternateFallbackQuery());
+            }
         }
     }
 
@@ -93,7 +119,8 @@ public class PackOpeningService {
         LOGGER.info("Loading Scryfall card pool '{}' with query '{}'.", cacheKey, query);
         List<CardDto> cards = scryfallClient.searchCards(query);
         if (cards.isEmpty()) {
-            throw new PackOpeningException("No cards were returned for pack slot: " + cacheKey);
+            LOGGER.info("No cards were returned for Scryfall card pool '{}'.", cacheKey);
+            return List.of();
         }
         LOGGER.info("Cached {} cards for Scryfall card pool '{}'.", cards.size(), cacheKey);
         return List.copyOf(cards);

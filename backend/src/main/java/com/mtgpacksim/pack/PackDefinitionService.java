@@ -118,22 +118,30 @@ public class PackDefinitionService {
                                 query(setCode, "rarity:mythic is:booster -frame:extendedart -frame:showcase -border:borderless"),
                                 COLLECTOR_MYTHIC_CHANCE
                         ),
-                        PackSlot.rareOrMythic(
+                        PackSlot.rareOrMythicWithFallback(
                                 "extended-art rare/mythic",
                                 2,
                                 cacheKey(setCode, "collector-extended-art-rare"),
                                 query(setCode, "rarity:rare is:booster frame:extendedart"),
+                                cacheKey(setCode, "collector-rare-fallback"),
+                                query(setCode, "rarity:rare is:booster"),
                                 cacheKey(setCode, "collector-extended-art-mythic"),
                                 query(setCode, "rarity:mythic is:booster frame:extendedart"),
+                                cacheKey(setCode, "collector-mythic-fallback"),
+                                query(setCode, "rarity:mythic is:booster"),
                                 COLLECTOR_WILDCARD_MYTHIC_CHANCE
                         ),
-                        PackSlot.rareOrMythic(
+                        PackSlot.rareOrMythicWithFallback(
                                 "showcase/borderless rare/mythic",
                                 2,
                                 cacheKey(setCode, "collector-showcase-borderless-rare"),
                                 query(setCode, "rarity:rare is:booster (frame:showcase or border:borderless)"),
+                                cacheKey(setCode, "collector-rare-fallback"),
+                                query(setCode, "rarity:rare is:booster"),
                                 cacheKey(setCode, "collector-showcase-borderless-mythic"),
                                 query(setCode, "rarity:mythic is:booster (frame:showcase or border:borderless)"),
+                                cacheKey(setCode, "collector-mythic-fallback"),
+                                query(setCode, "rarity:mythic is:booster"),
                                 COLLECTOR_WILDCARD_MYTHIC_CHANCE
                         ),
                         PackSlot.fixed("foil land", 1, cacheKey(setCode, "collector-land"), query(setCode, "type:basic"))
