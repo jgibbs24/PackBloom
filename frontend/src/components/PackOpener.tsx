@@ -273,7 +273,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
         delay(isFastMode ? 0 : 950),
       ]);
       setPack(openedPack);
-      setRevealedCount(revealMode === 'all' ? openedPack.cards.length : isFastMode ? 1 : 0);
+      setRevealedCount(revealMode === 'all' ? openedPack.cards.length : Math.min(1, openedPack.cards.length));
       setRevealPhase(revealMode === 'all' ? 'complete' : 'revealing');
       setHasCountedCurrentPack(revealMode === 'all');
       if (revealMode === 'all') {
@@ -537,7 +537,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                   onClick={() => {
                     setRevealMode('one-by-one');
                     if (pack) {
-                      setRevealedCount(0);
+                      setRevealedCount(Math.min(1, pack.cards.length));
                       setRevealPhase('revealing');
                     }
                   }}
@@ -553,7 +553,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                     onChange={(event) => setIsFastMode(event.target.checked)}
                     type="checkbox"
                   />
-                  Quick Open
+                  Fast Mode
                 </label>
                 {revealMode === 'one-by-one' && pack && revealPhase === 'revealing' && (
                   <>
@@ -571,9 +571,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                     >
                       {hasRevealedEveryCard
                         ? 'Finish pack'
-                        : revealedCount === 0
-                          ? `Reveal first card (0/${pack.cards.length})`
-                          : `Reveal next (${revealedCount}/${pack.cards.length})`}
+                        : `Reveal next (${revealedCount}/${pack.cards.length})`}
                     </button>
                     {isFastMode && !hasRevealedEveryCard && (
                       <button

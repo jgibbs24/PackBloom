@@ -28,7 +28,7 @@ export function CardRevealStack({ cards, isFastMode, onSelectCard, totalCards }:
       </div>
       {isFastMode && (
         <div className="absolute right-4 top-4 rounded-md border border-emerald-300/30 bg-emerald-400/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-100 backdrop-blur">
-          Quick Open
+          Fast Mode
         </div>
       )}
       <div className="relative flex h-[30rem] w-full max-w-md items-center justify-center">
