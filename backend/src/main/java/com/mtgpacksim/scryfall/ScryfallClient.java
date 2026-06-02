@@ -57,12 +57,14 @@ public class ScryfallClient {
     }
 
     private CardDto toCardDto(ScryfallCardResponse card) {
+        PriceDetails priceDetails = priceUsd(card.prices());
         return new CardDto(
                 card.id(),
                 card.name(),
                 card.rarity(),
                 imageUrl(card),
-                priceUsd(card.prices())
+                priceDetails.priceUsd(),
+                priceDetails.available()
         );
     }
 
@@ -86,10 +88,34 @@ public class ScryfallClient {
                 .or(() -> Optional.ofNullable(imageUris.get("small")));
     }
 
-    private BigDecimal priceUsd(Map<String, String> prices) {
-        if (prices == null || prices.get("usd") == null || prices.get("usd").isBlank()) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    static PriceDetails priceUsd(Map<String, String> prices) {
+        if (prices == null) {
+            return PriceDetails.unavailable();
         }
-        return new BigDecimal(prices.get("usd")).setScale(2, RoundingMode.HALF_UP);
+
+        return priceValue(prices, "usd")
+                .or(() -> priceValue(prices, "usd_foil"))
+                .or(() -> priceValue(prices, "usd_etched"))
+                .map(PriceDetails::available)
+                .orElseGet(PriceDetails::unavailable);
+    }
+
+    private static Optional<BigDecimal> priceValue(Map<String, String> prices, String key) {
+        String price = prices.get(key);
+        if (price == null || price.isBlank()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new BigDecimal(price).setScale(2, RoundingMode.HALF_UP));
+    }
+
+    record PriceDetails(BigDecimal priceUsd, boolean available) {
+        static PriceDetails available(BigDecimal priceUsd) {
+            return new PriceDetails(priceUsd, true);
+        }
+
+        static PriceDetails unavailable() {
+            return new PriceDetails(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), false);
+        }
     }
 }

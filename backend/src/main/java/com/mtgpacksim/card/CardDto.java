@@ -7,6 +7,7 @@ public record CardDto(
         String name,
         String rarity,
         String imageUrl,
-        BigDecimal priceUsd
+        BigDecimal priceUsd,
+        boolean priceAvailable
 ) {
 }

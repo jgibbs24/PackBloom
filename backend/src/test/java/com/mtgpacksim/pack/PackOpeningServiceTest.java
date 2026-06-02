@@ -96,7 +96,8 @@ class PackOpeningServiceTest {
                         rarity + " card " + index,
                         rarity,
                         "https://example.com/" + rarity + "-" + index + ".jpg",
-                        BigDecimal.ONE
+                        BigDecimal.ONE,
+                        true
                 ))
                 .toList();
     }

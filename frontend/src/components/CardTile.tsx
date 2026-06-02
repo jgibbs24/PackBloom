@@ -1,3 +1,4 @@
+import { formatCardPrice } from '../cardPrice';
 import type { CardDto } from '../types/pack';
 
 type CardTileProps = {
@@ -42,7 +43,7 @@ export function CardTile({ card, onSelect }: CardTileProps) {
             {card.rarity}
           </span>
           <span className="rounded bg-amethyst/20 px-2 py-1 font-semibold text-violet-100">
-            ${card.priceUsd.toFixed(2)}
+            {formatCardPrice(card)}
           </span>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { formatCardPrice } from '../cardPrice';
 import type { CardDto } from '../types/pack';
 
 type CardPreviewModalProps = {
@@ -28,7 +29,7 @@ export function CardPreviewModal({ card, onClose }: CardPreviewModalProps) {
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-ember">{card.rarity}</p>
             <h2 className="mt-2 text-3xl font-bold text-white">{card.name}</h2>
-            <p className="mt-4 text-2xl font-semibold text-violet-100">${card.priceUsd.toFixed(2)}</p>
+            <p className="mt-4 text-2xl font-semibold text-violet-100">{formatCardPrice(card)}</p>
           </div>
           <button
             className="rounded-md border border-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-ember hover:text-ember"

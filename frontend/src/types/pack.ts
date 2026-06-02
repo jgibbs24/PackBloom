@@ -4,6 +4,7 @@ export type CardDto = {
   rarity: string;
   imageUrl: string;
   priceUsd: number;
+  priceAvailable?: boolean;
 };
 
 export type OpenedPackDto = {

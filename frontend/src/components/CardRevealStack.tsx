@@ -1,3 +1,4 @@
+import { formatCardPrice } from '../cardPrice';
 import type { CardDto } from '../types/pack';
 
 type CardRevealStackProps = {
@@ -65,7 +66,7 @@ export function CardRevealStack({ cards, isFastMode, onSelectCard, totalCards }:
               <p className="line-clamp-1 text-sm font-semibold text-white">{currentCard.name}</p>
               <div className="mt-1 flex items-center justify-between gap-2 text-xs">
                 <span className="font-bold uppercase tracking-[0.16em] text-ember">{currentCard.rarity}</span>
-                <span className="font-semibold text-violet-100">${currentCard.priceUsd.toFixed(2)}</span>
+                <span className="font-semibold text-violet-100">{formatCardPrice(currentCard)}</span>
               </div>
             </div>
           </button>

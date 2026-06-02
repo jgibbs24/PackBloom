@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { formatCardPrice } from '../cardPrice';
 import type { CardDto, PackHistoryEntry } from '../types/pack';
 
 type BinderPageProps = {
@@ -120,7 +121,7 @@ export function BinderPage({ cards, packHistory, onSelectCard }: BinderPageProps
                 <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-white">{record.card.name}</p>
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <span className="font-bold uppercase tracking-[0.12em] text-stone-400">{record.setCode}</span>
-                  <span className="font-bold text-violet-100">${record.card.priceUsd.toFixed(2)}</span>
+                  <span className="font-bold text-violet-100">{formatCardPrice(record.card)}</span>
                 </div>
               </div>
             </button>
@@ -261,7 +262,7 @@ export function BinderPage({ cards, packHistory, onSelectCard }: BinderPageProps
                   <div className="flex items-center justify-between gap-2 text-xs">
                     <span className="font-bold uppercase tracking-[0.16em] text-stone-300">{entry.bestCopy.card.rarity}</span>
                     <span className="rounded bg-amethyst/20 px-2 py-1 font-semibold text-violet-100">
-                      ${entry.bestCopy.card.priceUsd.toFixed(2)}
+                      {formatCardPrice(entry.bestCopy.card)}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-stone-500">

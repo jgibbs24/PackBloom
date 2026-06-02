@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { fetchApiHealth, fetchSupportedSets, openPack, warmUpPack } from '../api/packApi';
 import { playFeedbackSound } from '../audioFeedback';
+import { formatCardPrice } from '../cardPrice';
 import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabels';
 import { preloadPackWrapperImages } from '../packWrapperImages';
 import { clearPersistedSession, loadPersistedSession, savePersistedSession } from '../sessionStorage';
@@ -680,7 +681,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
               <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xl font-black text-white">{chaseHitCard.name}</p>
-                  <p className="text-sm font-semibold text-emerald-100">${chaseHitCard.priceUsd.toFixed(2)}</p>
+                  <p className="text-sm font-semibold text-emerald-100">{formatCardPrice(chaseHitCard)}</p>
                 </div>
                 <button
                   className="rounded-md border border-emerald-200/40 px-3 py-2 text-sm font-bold text-emerald-100 transition hover:border-emerald-100 hover:bg-emerald-300/10"

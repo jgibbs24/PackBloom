@@ -1,3 +1,4 @@
+import { formatCardPrice } from '../cardPrice';
 import type { SessionStats } from '../types/pack';
 import { AnimatedCurrency } from './AnimatedCurrency';
 
@@ -70,7 +71,7 @@ export function SessionStatsPanel({ onResetSession, stats }: SessionStatsPanelPr
                 />
                 <div className="min-w-0">
                   <p className="line-clamp-2 font-semibold text-white">{stats.bestCard.name}</p>
-                  <p className="mt-1 font-semibold text-ember">${stats.bestCard.priceUsd.toFixed(2)}</p>
+                  <p className="mt-1 font-semibold text-ember">{formatCardPrice(stats.bestCard)}</p>
                 </div>
               </div>
             ) : (

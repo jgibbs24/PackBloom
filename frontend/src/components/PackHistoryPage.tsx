@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { formatCardPrice } from '../cardPrice';
 import type { CardDto, PackHistoryEntry } from '../types/pack';
 
 type PackHistoryPageProps = {
@@ -192,7 +193,7 @@ export function PackHistoryPage({ entries, onSelectCard }: PackHistoryPageProps)
                           type="button"
                         >
                           <span className="block text-lg font-bold text-white">{bestCard.name}</span>
-                          <span className="text-sm font-semibold text-violet-100">${bestCard.priceUsd.toFixed(2)}</span>
+                          <span className="text-sm font-semibold text-violet-100">{formatCardPrice(bestCard)}</span>
                         </button>
                       ) : (
                         <p className="mt-2 text-sm text-stone-400">No cards found.</p>
@@ -223,7 +224,7 @@ export function PackHistoryPage({ entries, onSelectCard }: PackHistoryPageProps)
                           <p className="line-clamp-2 min-h-8 text-xs font-semibold leading-4 text-white">{card.name}</p>
                           <div className="flex items-center justify-between gap-2 text-[0.68rem]">
                             <span className="font-bold uppercase tracking-[0.12em] text-stone-400">{card.rarity}</span>
-                            <span className="font-semibold text-violet-100">${card.priceUsd.toFixed(2)}</span>
+                            <span className="font-semibold text-violet-100">{formatCardPrice(card)}</span>
                           </div>
                         </div>
                       </button>
