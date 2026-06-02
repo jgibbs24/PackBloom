@@ -34,13 +34,18 @@ public class PackController {
     }
 
     @GetMapping("/{setCode}/warmup")
-    public CompletableFuture<ResponseEntity<Void>> warmUpPack(
+    public ResponseEntity<WarmupStatusDto> warmUpPack(
             @PathVariable String setCode,
             @RequestParam(defaultValue = "play") String boosterType
     ) {
-        return CompletableFuture
-                .runAsync(() -> packOpeningService.warmUpPack(setCode, boosterType))
-                .orTimeout(PACK_OPENING_TIMEOUT.toSeconds(), TimeUnit.SECONDS)
-                .thenApply(ignored -> ResponseEntity.accepted().build());
+        return ResponseEntity.accepted().body(packOpeningService.startWarmUpPack(setCode, boosterType));
+    }
+
+    @GetMapping("/{setCode}/warmup/status")
+    public ResponseEntity<WarmupStatusDto> warmUpStatus(
+            @PathVariable String setCode,
+            @RequestParam(defaultValue = "play") String boosterType
+    ) {
+        return ResponseEntity.ok(packOpeningService.warmUpStatus(setCode, boosterType));
     }
 }

@@ -9,8 +9,11 @@ export type PersistedSessionState = {
   binderCards: CardDto[];
   boosterTypesBySetCode: Record<string, BoosterType>;
   chaseCardName: string;
+  isAudioMuted: boolean;
   isAudioEnabled: boolean;
   isFastMode: boolean;
+  isMusicEnabled: boolean;
+  isSfxEnabled: boolean;
   packHistory: PackHistoryEntry[];
   revealMode: 'all' | 'one-by-one';
   selectedSetCode: string;
@@ -51,8 +54,11 @@ export function loadPersistedSession(): PersistedSessionState | null {
       binderCards: parsedSession.binderCards ?? [],
       boosterTypesBySetCode: parsedSession.boosterTypesBySetCode ?? {},
       chaseCardName: parsedSession.chaseCardName ?? '',
+      isAudioMuted: parsedSession.isAudioMuted ?? !(parsedSession.isAudioEnabled ?? false),
       isAudioEnabled: parsedSession.isAudioEnabled ?? false,
       isFastMode: parsedSession.isFastMode ?? false,
+      isMusicEnabled: parsedSession.isMusicEnabled ?? false,
+      isSfxEnabled: parsedSession.isSfxEnabled ?? parsedSession.isAudioEnabled ?? true,
       packHistory: parsedSession.packHistory ?? [],
       revealMode: parsedSession.revealMode,
       selectedSetCode: parsedSession.selectedSetCode,

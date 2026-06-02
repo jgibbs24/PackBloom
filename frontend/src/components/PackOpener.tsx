@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchApiHealth, fetchSupportedSets, openPack, warmUpPack } from '../api/packApi';
-import { playFeedbackSound } from '../audioFeedback';
+import { fetchApiHealth, fetchSupportedSets, fetchWarmupStatus, openPack, warmUpPack } from '../api/packApi';
+import type { WarmupStatusDto } from '../api/packApi';
+import { playFeedbackSound, syncBackgroundMusic } from '../audioFeedback';
 import { formatCardPrice } from '../cardPrice';
 import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabels';
 import { preloadPackWrapperImages } from '../packWrapperImages';
@@ -58,6 +59,8 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('checking');
   const [engineRetryKey, setEngineRetryKey] = useState(0);
   const [engineWaitSeconds, setEngineWaitSeconds] = useState(0);
+  const [openingWaitSeconds, setOpeningWaitSeconds] = useState(0);
+  const [warmupStatus, setWarmupStatus] = useState<WarmupStatusDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sessionStats, setSessionStats] = useState<SessionStats>(persistedSession?.sessionStats ?? initialSessionStats);
   const [revealMode, setRevealMode] = useState<RevealMode>(persistedSession?.revealMode ?? 'all');
@@ -76,7 +79,10 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const [isOpeningWrapper, setIsOpeningWrapper] = useState(false);
   const [landingSetIndex, setLandingSetIndex] = useState(0);
   const [isFastMode, setIsFastMode] = useState(persistedSession?.isFastMode ?? false);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(persistedSession?.isAudioEnabled ?? false);
+  const [isAudioMuted, setIsAudioMuted] = useState(persistedSession?.isAudioMuted ?? !(persistedSession?.isAudioEnabled ?? false));
+  const [isAudioSettingsOpen, setIsAudioSettingsOpen] = useState(false);
+  const [isMusicEnabled, setIsMusicEnabled] = useState(persistedSession?.isMusicEnabled ?? false);
+  const [isSfxEnabled, setIsSfxEnabled] = useState(persistedSession?.isSfxEnabled ?? persistedSession?.isAudioEnabled ?? true);
   const [chaseCardName, setChaseCardName] = useState(persistedSession?.chaseCardName ?? '');
   const [chaseHitCard, setChaseHitCard] = useState<CardDto | null>(null);
 
@@ -105,8 +111,11 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       binderCards,
       boosterTypesBySetCode,
       chaseCardName,
-      isAudioEnabled,
+      isAudioEnabled: !isAudioMuted && isSfxEnabled,
+      isAudioMuted,
       isFastMode,
+      isMusicEnabled,
+      isSfxEnabled,
       packHistory,
       revealMode,
       selectedSetCode,
@@ -118,8 +127,10 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     binderCards,
     boosterTypesBySetCode,
     chaseCardName,
-    isAudioEnabled,
+    isAudioMuted,
     isFastMode,
+    isMusicEnabled,
+    isSfxEnabled,
     packHistory,
     revealMode,
     selectedSetCode,
@@ -205,10 +216,63 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       return;
     }
 
-    warmUpPack(selectedSetCode, selectedBoosterType).catch(() => {
+    let ignore = false;
+    setWarmupStatus(null);
+
+    warmUpPack(selectedSetCode, selectedBoosterType).then((status) => {
+      if (!ignore) {
+        setWarmupStatus(status);
+      }
+    }).catch(() => {
       // Warmup is an opportunistic cache fill; opening the pack still handles real errors.
     });
+
+    return () => {
+      ignore = true;
+    };
   }, [engineStatus, selectedBoosterType, selectedSetCode, sets.length]);
+
+  useEffect(() => {
+    if (!warmupStatus || warmupStatus.status !== 'loading') {
+      return;
+    }
+
+    let ignore = false;
+    const intervalId = window.setInterval(() => {
+      fetchWarmupStatus(warmupStatus.setCode, warmupStatus.boosterType).then((status) => {
+        if (!ignore) {
+          setWarmupStatus(status);
+        }
+      }).catch(() => undefined);
+    }, 1500);
+
+    return () => {
+      ignore = true;
+      window.clearInterval(intervalId);
+    };
+  }, [warmupStatus]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setOpeningWaitSeconds(0);
+      return;
+    }
+
+    const startedAt = Date.now();
+    const intervalId = window.setInterval(() => {
+      setOpeningWaitSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isLoading]);
+
+  useEffect(() => {
+    syncBackgroundMusic(!isAudioMuted && isMusicEnabled);
+
+    return () => {
+      syncBackgroundMusic(false);
+    };
+  }, [isAudioMuted, isMusicEnabled]);
 
   function resetCurrentPack() {
     setPack(null);
@@ -232,7 +296,10 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     setSelectedCard(null);
     setRevealMode('all');
     setIsFastMode(false);
-    setIsAudioEnabled(false);
+    setIsAudioMuted(true);
+    setIsAudioSettingsOpen(false);
+    setIsMusicEnabled(false);
+    setIsSfxEnabled(true);
     setBoosterTypesBySetCode({});
     setSelectedSetCode(sets[0]?.setCode ?? DEFAULT_SET_CODE);
     setAppStep('start');
@@ -282,7 +349,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       return;
     }
 
-    playFeedbackSound('pack', isAudioEnabled);
+    playFeedbackSound('pack', canPlaySfx);
     setIsLoading(true);
     setIsOpeningWrapper(!isFastMode);
     setError(null);
@@ -327,8 +394,21 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const isPackControlLocked = isLoading || isOpeningWrapper || isRevealLocked;
   const isEngineReady = engineStatus === 'ready';
   const canStartOpeningFlow = sets.length > 0;
+  const canPlaySfx = !isAudioMuted && isSfxEnabled;
   const normalizedChaseName = chaseCardName.trim().toLowerCase();
   const chaseNames = parseChaseNames(chaseCardName);
+  const audioControls = (
+    <AudioControls
+      isMuted={isAudioMuted}
+      isMusicEnabled={isMusicEnabled}
+      isOpen={isAudioSettingsOpen}
+      isSfxEnabled={isSfxEnabled}
+      onMuteToggle={() => setIsAudioMuted((currentValue) => !currentValue)}
+      onMusicToggle={() => setIsMusicEnabled((currentValue) => !currentValue)}
+      onOpenToggle={() => setIsAudioSettingsOpen((currentValue) => !currentValue)}
+      onSfxToggle={() => setIsSfxEnabled((currentValue) => !currentValue)}
+    />
+  );
 
   function completePack(openedPack: OpenedPackDto) {
     const chasePull = findChaseCard(openedPack.cards, normalizedChaseName);
@@ -344,7 +424,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
 
     if (chasePull) {
       setChaseHitCard(chasePull);
-      playFeedbackSound('mythic', isAudioEnabled);
+      playFeedbackSound('mythic', canPlaySfx);
     }
   }
 
@@ -354,7 +434,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     }
 
     const nextCard = pack.cards[revealedCount];
-    playFeedbackSound(nextCard?.rarity === 'mythic' ? 'mythic' : 'flip', isAudioEnabled);
+    playFeedbackSound(nextCard?.rarity === 'mythic' ? 'mythic' : 'flip', canPlaySfx);
     setRevealedCount((count) => Math.min(count + 1, pack.cards.length));
   }
 
@@ -377,66 +457,87 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
 
   if (appStep === 'start') {
     return (
-      <section
-        className="relative flex flex-1 items-center overflow-hidden rounded-lg border border-white/10 bg-stone-950/60 px-6 py-10 shadow-card sm:px-10"
-        style={themeStyle}
-      >
-        <div
-          className="absolute inset-0 -z-0 opacity-70"
-          style={{
-            background:
-              'linear-gradient(135deg, var(--set-background), rgba(255,255,255,0.04) 42%, rgba(0,0,0,0.42)), linear-gradient(90deg, var(--set-primary), transparent 58%)',
-          }}
-        />
-        <div className="relative z-10 grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <div>
-            <h2 className="max-w-3xl text-5xl font-black leading-[0.98] text-white sm:text-6xl lg:text-7xl">
-              Crack the next pack.
-            </h2>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <button
-                className="rounded-md bg-ember px-6 py-3 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-                disabled={!canStartOpeningFlow}
-                onClick={() => setAppStep('select-set')}
-                type="button"
-              >
-                Play
-              </button>
-              {engineStatus !== 'ready' && (
-                <div className="max-w-md self-center text-sm font-semibold text-stone-300">
-                  <p>{getEngineStatusMessage(engineStatus, engineWaitSeconds)}</p>
-                  {(engineStatus === 'waking' || engineWaitSeconds >= 8) && (
-                    <button
-                      className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-ember underline-offset-4 hover:underline"
-                      onClick={() => setEngineRetryKey((currentKey) => currentKey + 1)}
-                      type="button"
-                    >
-                      Check again
-                    </button>
-                  )}
-                </div>
-              )}
-              {engineStatus === 'ready' && error && sets.length === 0 && (
-                <p className="max-w-sm self-center text-sm font-semibold text-red-100">
-                  Could not load supported sets. Try refreshing in a moment.
-                </p>
-              )}
+      <>
+        <section
+          className="packbloom-landing-panel relative flex flex-1 items-center overflow-hidden rounded-lg border border-white/10 bg-stone-950/60 px-6 py-10 shadow-card sm:px-10"
+          style={themeStyle}
+        >
+          <div
+            className="absolute inset-0 -z-0 opacity-70"
+            style={{
+              background:
+                'linear-gradient(135deg, var(--set-background), rgba(255,255,255,0.04) 42%, rgba(0,0,0,0.42)), linear-gradient(90deg, var(--set-primary), transparent 58%)',
+            }}
+          />
+          <div className="landing-foil-sweep absolute inset-0 z-0 opacity-60" />
+          <div className="absolute left-6 top-6 z-0 h-12 w-12 border-l border-t border-ember/45 sm:left-8 sm:top-8" />
+          <div className="absolute bottom-6 right-6 z-0 h-12 w-12 border-b border-r border-white/25 sm:bottom-8 sm:right-8" />
+          <div className="landing-set-rail absolute bottom-8 left-6 z-0 hidden gap-2 sm:flex">
+            {sets.slice(0, 7).map((set) => (
+              <span
+                className="h-1.5 w-10 rounded-full bg-white/25"
+                key={set.setCode}
+                style={{
+                  backgroundColor: set.setCode === landingSet?.setCode
+                    ? getSetTheme(set.setCode).accent
+                    : 'rgba(255,255,255,0.22)',
+                }}
+              />
+            ))}
+          </div>
+          <div className="relative z-10 grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
+            <div>
+              <h2 className="max-w-3xl text-5xl font-black leading-[0.98] text-white sm:text-6xl lg:text-7xl">
+                Crack the next pack.
+              </h2>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <button
+                  className="rounded-md bg-ember px-6 py-3 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+                  disabled={!canStartOpeningFlow}
+                  onClick={() => setAppStep('select-set')}
+                  type="button"
+                >
+                  Play
+                </button>
+                {engineStatus !== 'ready' && (
+                  <div className="max-w-md self-center text-sm font-semibold text-stone-300">
+                    <p>{getEngineStatusMessage(engineStatus, engineWaitSeconds)}</p>
+                    {(engineStatus === 'waking' || engineWaitSeconds >= 8) && (
+                      <button
+                        className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-ember underline-offset-4 hover:underline"
+                        onClick={() => setEngineRetryKey((currentKey) => currentKey + 1)}
+                        type="button"
+                      >
+                        Check again
+                      </button>
+                    )}
+                  </div>
+                )}
+                {engineStatus === 'ready' && error && sets.length === 0 && (
+                  <p className="max-w-sm self-center text-sm font-semibold text-red-100">
+                    Could not load supported sets. Try refreshing in a moment.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="mx-auto">
+              <div className="landing-pack-stage relative">
+                <div className="absolute -inset-8 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.18),transparent_62%)] opacity-70 blur-xl" />
+                <PackWrapper
+                  boosterType={getBoosterTypeForSet(landingSet?.setCode, boosterTypesBySetCode)}
+                  packTypeLabel={landingBooster.label}
+                  set={landingSet}
+                  theme={landingTheme}
+                />
+              </div>
             </div>
           </div>
-
-          <div className="mx-auto">
-            <PackWrapper
-              boosterType={getBoosterTypeForSet(landingSet?.setCode, boosterTypesBySetCode)}
-              packTypeLabel={landingBooster.label}
-              set={landingSet}
-              theme={landingTheme}
-            />
-          </div>
-        </div>
-      </section>
+        </section>
+        {audioControls}
+      </>
     );
   }
-
   if (appStep === 'select-set') {
     return (
       <>
@@ -455,6 +556,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
             {error}
           </div>
         )}
+        {audioControls}
       </>
     );
   }
@@ -579,6 +681,19 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                   {getEngineStatusMessage(engineStatus, engineWaitSeconds)} You can choose a set now; pack opening unlocks when the engine responds.
                 </div>
               )}
+              {isEngineReady && warmupStatus && warmupStatus.status !== 'ready' && (
+                <div className="mt-4 rounded-md border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-stone-300">
+                  {getWarmupStatusMessage(warmupStatus)}
+                </div>
+              )}
+              {isLoading && openingWaitSeconds >= 3 && (
+                <div className="mt-4 rounded-md border border-ember/25 bg-ember/10 px-4 py-3 text-sm font-semibold text-amber-100">
+                  Loading card pools from Scryfall. First opens can take longer while PackBloom fills its cache.
+                  {warmupStatus && warmupStatus.totalPools > 0 && (
+                    <span> Cache progress: {warmupStatus.loadedPools}/{warmupStatus.totalPools} pools.</span>
+                  )}
+                </div>
+              )}
 
               <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
                 <button
@@ -621,15 +736,6 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                     type="checkbox"
                   />
                   Fast Mode
-                </label>
-                <label className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${isAudioEnabled ? 'bg-ember text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}>
-                  <input
-                    checked={isAudioEnabled}
-                    className="h-4 w-4 accent-ember"
-                    onChange={(event) => setIsAudioEnabled(event.target.checked)}
-                    type="checkbox"
-                  />
-                  SFX
                 </label>
                 {revealMode === 'one-by-one' && pack && revealPhase === 'revealing' && (
                   <>
@@ -757,8 +863,101 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
         </div>
       </div>
 
+      {audioControls}
+
       {selectedCard && <CardPreviewModal card={selectedCard} onClose={() => setSelectedCard(null)} />}
     </>
+  );
+}
+
+function AudioControls({
+  isMuted,
+  isMusicEnabled,
+  isOpen,
+  isSfxEnabled,
+  onMusicToggle,
+  onMuteToggle,
+  onOpenToggle,
+  onSfxToggle,
+}: {
+  isMuted: boolean;
+  isMusicEnabled: boolean;
+  isOpen: boolean;
+  isSfxEnabled: boolean;
+  onMusicToggle: () => void;
+  onMuteToggle: () => void;
+  onOpenToggle: () => void;
+  onSfxToggle: () => void;
+}) {
+  return (
+    <div className="fixed bottom-5 right-5 z-40 flex items-end gap-2 sm:bottom-7 sm:right-7">
+      {isOpen && (
+        <div className="mb-14 w-48 rounded-lg border border-white/10 bg-stone-900/95 p-3 shadow-card backdrop-blur">
+          <AudioToggle isChecked={isMusicEnabled} label="Music" onToggle={onMusicToggle} />
+          <AudioToggle isChecked={isSfxEnabled} label="SFX" onToggle={onSfxToggle} />
+        </div>
+      )}
+      <button
+        aria-label="Audio settings"
+        aria-expanded={isOpen}
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-stone-800/90 text-stone-200 shadow-card backdrop-blur transition hover:-translate-y-0.5 hover:border-ember hover:text-ember focus:outline-none focus:ring-2 focus:ring-ember/70"
+        onClick={onOpenToggle}
+        title="Audio settings"
+        type="button"
+      >
+        <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+          <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          <path d="M8 7h.01M14 12h.01M11 17h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="4" />
+        </svg>
+      </button>
+      <button
+        aria-label={isMuted ? 'Unmute audio' : 'Mute audio'}
+        aria-pressed={isMuted}
+        className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-stone-800/90 text-white shadow-card backdrop-blur transition hover:-translate-y-0.5 hover:border-ember hover:text-ember focus:outline-none focus:ring-2 focus:ring-ember/70"
+        onClick={onMuteToggle}
+        title={isMuted ? 'Unmute audio' : 'Mute audio'}
+        type="button"
+      >
+        <SpeakerIcon isMuted={isMuted} />
+      </button>
+    </div>
+  );
+}
+
+function AudioToggle({ isChecked, label, onToggle }: { isChecked: boolean; label: string; onToggle: () => void }) {
+  return (
+    <button
+      aria-pressed={isChecked}
+      className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm font-semibold text-stone-200 transition hover:bg-white/[0.06]"
+      onClick={onToggle}
+      type="button"
+    >
+      <span>{label}</span>
+      <span className={`relative h-6 w-10 rounded-full transition ${isChecked ? 'bg-ember' : 'bg-white/15'}`}>
+        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${isChecked ? 'left-5' : 'left-1'}`} />
+      </span>
+    </button>
+  );
+}
+
+function SpeakerIcon({ isMuted }: { isMuted: boolean }) {
+  return (
+    <svg aria-hidden="true" className="h-7 w-7" fill="none" viewBox="0 0 32 32">
+      <path
+        d="M4.5 19.5v-7h5.2l7.1-6.2v19.4l-7.1-6.2H4.5Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="2.2"
+      />
+      {isMuted ? (
+        <path d="M23 10 29 22M29 10 23 22" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+      ) : (
+        <>
+          <path d="M21.3 11.2c1.2 1.2 1.9 2.9 1.9 4.8s-.7 3.6-1.9 4.8" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+          <path d="M25.2 8.4c1.9 1.9 3 4.6 3 7.6s-1.1 5.7-3 7.6" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+        </>
+      )}
+    </svg>
   );
 }
 
@@ -810,6 +1009,22 @@ function getEngineStatusMessage(engineStatus: EngineStatus, waitSeconds: number)
   }
 
   return 'Starting the pack engine. Free hosting can take about a minute after inactivity.';
+}
+
+function getWarmupStatusMessage(warmupStatus: WarmupStatusDto): string {
+  if (warmupStatus.totalPools <= 0) {
+    return 'Preparing card pools for this pack.';
+  }
+
+  if (warmupStatus.status === 'idle') {
+    return 'Card pools will preload when the pack engine is ready.';
+  }
+
+  if (warmupStatus.status === 'error') {
+    return 'Card pool preload hit a temporary issue. Opening still retries the needed card data.';
+  }
+
+  return `Preloading card pools ${warmupStatus.loadedPools}/${warmupStatus.totalPools}. You can open now, but the first pack may finish the cache.`;
 }
 
 function getBoosterTypeForSet(

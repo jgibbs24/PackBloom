@@ -5,6 +5,14 @@ import { apiUrl } from './apiUrl';
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
 const PACK_OPENING_TIMEOUT_MS = 30000;
 
+export type WarmupStatusDto = {
+  boosterType: BoosterType;
+  loadedPools: number;
+  setCode: string;
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  totalPools: number;
+};
+
 export async function fetchApiHealth(): Promise<void> {
   const response = await fetchWithTimeout(apiUrl('/api/health'), DEFAULT_REQUEST_TIMEOUT_MS, {
     headers: {
@@ -59,7 +67,7 @@ export async function openPack(setCode: string, boosterType: BoosterType): Promi
   }
 }
 
-export async function warmUpPack(setCode: string, boosterType: BoosterType): Promise<void> {
+export async function warmUpPack(setCode: string, boosterType: BoosterType): Promise<WarmupStatusDto> {
   const searchParams = new URLSearchParams({ boosterType });
 
   const response = await fetchWithTimeout(apiUrl(`/api/packs/${setCode}/warmup?${searchParams.toString()}`), DEFAULT_REQUEST_TIMEOUT_MS, {
@@ -71,6 +79,24 @@ export async function warmUpPack(setCode: string, boosterType: BoosterType): Pro
   if (!response.ok) {
     throw new Error(`Pack warmup failed with status ${response.status}`);
   }
+
+  return response.json();
+}
+
+export async function fetchWarmupStatus(setCode: string, boosterType: BoosterType): Promise<WarmupStatusDto> {
+  const searchParams = new URLSearchParams({ boosterType });
+
+  const response = await fetchWithTimeout(apiUrl(`/api/packs/${setCode}/warmup/status?${searchParams.toString()}`), DEFAULT_REQUEST_TIMEOUT_MS, {
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Pack warmup status failed with status ${response.status}`);
+  }
+
+  return response.json();
 }
 
 function fetchWithTimeout(

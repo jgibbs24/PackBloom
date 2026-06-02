@@ -119,6 +119,22 @@ class PackOpeningServiceTest {
         verify(scryfallClient).searchCards("set:blb type:basic");
     }
 
+    @Test
+    void reportsWarmupStatusFromCachedPools() {
+        WarmupStatusDto initialStatus = service.warmUpStatus("blb", "collector");
+
+        assertThat(initialStatus.status()).isEqualTo("idle");
+        assertThat(initialStatus.loadedPools()).isZero();
+        assertThat(initialStatus.totalPools()).isEqualTo(11);
+
+        service.warmUpPack("blb", "collector");
+
+        WarmupStatusDto readyStatus = service.warmUpStatus("blb", "collector");
+        assertThat(readyStatus.status()).isEqualTo("ready");
+        assertThat(readyStatus.loadedPools()).isEqualTo(11);
+        assertThat(readyStatus.totalPools()).isEqualTo(11);
+    }
+
     private void stubCardPools() {
         when(scryfallClient.searchCards(argThat(query -> query != null && query.contains("type:basic"))))
                 .thenReturn(cards("basic", 20));
