@@ -12,13 +12,13 @@ export default function App() {
         <header className="mb-8 flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <button
-              className="text-left transition hover:text-ember focus:outline-none focus:ring-2 focus:ring-ember/70"
+              className="text-left transition hover:text-ember focus:outline-none"
               onClick={() => setAppStep('start')}
               type="button"
             >
               <h1 className="text-4xl font-bold tracking-tight text-white transition hover:text-ember sm:text-5xl">
-              PackBloom
-            </h1>
+                PackBloom
+              </h1>
             </button>
             <p className="mt-2 text-sm font-semibold text-stone-400">
               A Magic: The Gathering Pack Simulator
