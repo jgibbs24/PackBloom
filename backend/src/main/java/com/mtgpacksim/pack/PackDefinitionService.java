@@ -12,7 +12,8 @@ import java.util.stream.Collectors;
 @Service
 public class PackDefinitionService {
     private static final double MYTHIC_CHANCE = 0.125;
-    private static final double COLLECTOR_MYTHIC_CHANCE = 0.25;
+    private static final double COLLECTOR_MYTHIC_CHANCE = 0.20;
+    private static final double COLLECTOR_WILDCARD_MYTHIC_CHANCE = 0.35;
     private static final double DEFAULT_PLAY_BOOSTER_MSRP_USD = 5.99;
     private static final double DEFAULT_COLLECTOR_BOOSTER_MSRP_USD = 24.99;
     private static final String COLLECTOR_BOOSTER_TYPE = "collector-booster-barebones";
@@ -107,16 +108,24 @@ public class PackDefinitionService {
                 "collector",
                 DEFAULT_COLLECTOR_BOOSTER_MSRP_USD,
                 List.of(
-                        PackSlot.fixed("commons", 4, cacheKey(setCode, "collector-common"), query(setCode, "rarity:common -type:basic")),
-                        PackSlot.fixed("uncommons", 5, cacheKey(setCode, "collector-uncommon"), query(setCode, "rarity:uncommon")),
+                        PackSlot.fixed("commons", 5, cacheKey(setCode, "collector-common"), query(setCode, "rarity:common is:booster -type:basic")),
+                        PackSlot.fixed("uncommons", 4, cacheKey(setCode, "collector-uncommon"), query(setCode, "rarity:uncommon is:booster")),
                         PackSlot.rareOrMythic(
-                                "rare-or-mythic",
-                                5,
+                                "rare-or-mythic-slots",
+                                4,
                                 cacheKey(setCode, "collector-rare"),
-                                query(setCode, "rarity:rare"),
+                                query(setCode, "rarity:rare is:booster"),
                                 cacheKey(setCode, "collector-mythic"),
-                                query(setCode, "rarity:mythic"),
+                                query(setCode, "rarity:mythic is:booster"),
                                 COLLECTOR_MYTHIC_CHANCE
+                        ),
+                        PackSlot.rareOrMythic(
+                                "rare-or-mythic-wildcard",
+                                cacheKey(setCode, "collector-rare"),
+                                query(setCode, "rarity:rare is:booster"),
+                                cacheKey(setCode, "collector-mythic"),
+                                query(setCode, "rarity:mythic is:booster"),
+                                COLLECTOR_WILDCARD_MYTHIC_CHANCE
                         ),
                         PackSlot.fixed("land", 1, cacheKey(setCode, "collector-land"), query(setCode, "type:basic"))
                 )

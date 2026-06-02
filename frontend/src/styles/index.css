@@ -25,20 +25,26 @@ a {
 
 .mythic-reveal-burst {
   position: absolute;
-  inset: 16%;
+  inset: 4%;
   pointer-events: none;
   background:
-    radial-gradient(circle, rgba(251, 146, 60, 0.42), transparent 34%),
-    conic-gradient(from 18deg, transparent 0deg, rgba(253, 186, 116, 0.8) 22deg, transparent 46deg, transparent 82deg, rgba(251, 146, 60, 0.72) 108deg, transparent 132deg, transparent 210deg, rgba(255, 237, 213, 0.65) 236deg, transparent 262deg);
-  filter: blur(1px);
+    radial-gradient(circle at 18% 22%, rgba(255, 184, 61, 0.95) 0 1.4%, rgba(255, 149, 0, 0.55) 1.8%, transparent 4%),
+    radial-gradient(circle at 34% 35%, rgba(255, 211, 118, 0.9) 0 1%, rgba(255, 149, 0, 0.5) 1.4%, transparent 3.2%),
+    radial-gradient(circle at 72% 27%, rgba(255, 184, 61, 0.95) 0 1.7%, rgba(255, 149, 0, 0.55) 2.2%, transparent 5%),
+    radial-gradient(circle at 82% 62%, rgba(255, 211, 118, 0.95) 0 1.2%, rgba(255, 149, 0, 0.48) 1.8%, transparent 4%),
+    radial-gradient(circle at 27% 75%, rgba(255, 184, 61, 0.9) 0 1.2%, rgba(255, 149, 0, 0.45) 1.8%, transparent 4%),
+    conic-gradient(from 0deg at 18% 22%, transparent 0 10deg, rgba(255, 149, 0, 0.9) 10deg 12deg, transparent 12deg 88deg, rgba(255, 149, 0, 0.9) 88deg 90deg, transparent 90deg 178deg, rgba(255, 149, 0, 0.9) 178deg 180deg, transparent 180deg 268deg, rgba(255, 149, 0, 0.9) 268deg 270deg, transparent 270deg),
+    conic-gradient(from 0deg at 72% 27%, transparent 0 8deg, rgba(255, 179, 56, 0.85) 8deg 11deg, transparent 11deg 86deg, rgba(255, 179, 56, 0.85) 86deg 89deg, transparent 89deg 176deg, rgba(255, 179, 56, 0.85) 176deg 179deg, transparent 179deg 266deg, rgba(255, 179, 56, 0.85) 266deg 269deg, transparent 269deg),
+    conic-gradient(from 0deg at 82% 62%, transparent 0 8deg, rgba(255, 149, 0, 0.8) 8deg 10deg, transparent 10deg 88deg, rgba(255, 149, 0, 0.8) 88deg 90deg, transparent 90deg 178deg, rgba(255, 149, 0, 0.8) 178deg 180deg, transparent 180deg 268deg, rgba(255, 149, 0, 0.8) 268deg 270deg, transparent 270deg);
+  filter: drop-shadow(0 0 9px rgba(255, 149, 0, 0.82));
   opacity: 0;
-  animation: mythic-reveal-burst 900ms ease-out forwards;
+  animation: mythic-reveal-burst 1100ms ease-out forwards;
 }
 
 @keyframes mythic-reveal-burst {
   0% {
     opacity: 0;
-    transform: scale(0.65) rotate(0deg);
+    transform: scale(0.72);
   }
 
   35% {
@@ -47,7 +53,7 @@ a {
 
   100% {
     opacity: 0;
-    transform: scale(1.55) rotate(24deg);
+    transform: scale(1.18);
   }
 }
 

@@ -1,12 +1,14 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { fetchApiHealth, fetchSupportedSets, openPack, warmUpPack } from '../api/packApi';
+import { playFeedbackSound } from '../audioFeedback';
 import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabels';
 import { preloadPackWrapperImages } from '../packWrapperImages';
 import { clearPersistedSession, loadPersistedSession, savePersistedSession } from '../sessionStorage';
 import { getSetTheme } from '../setThemes';
 import { FALLBACK_SUPPORTED_SETS } from '../supportedSets';
 import type { CardDto, OpenedPackDto, PackHistoryEntry, SessionStats, SupportedSetDto } from '../types/pack';
+import { AdvancedStatsPage } from './AdvancedStatsPage';
 import { BinderPage } from './BinderPage';
 import { CardGrid } from './CardGrid';
 import { CardPreviewModal } from './CardPreviewModal';
@@ -27,7 +29,7 @@ const LANDING_FALLBACK_SET: SupportedSetDto = {
 };
 type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
-type ActiveView = 'opener' | 'binder' | 'history';
+type ActiveView = 'opener' | 'binder' | 'history' | 'stats';
 type EngineStatus = 'checking' | 'ready' | 'waking' | 'unavailable';
 export type AppStep = 'start' | 'select-set' | 'open-pack';
 
@@ -74,6 +76,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const [isOpeningWrapper, setIsOpeningWrapper] = useState(false);
   const [landingSetIndex, setLandingSetIndex] = useState(0);
   const [isFastMode, setIsFastMode] = useState(persistedSession?.isFastMode ?? false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(persistedSession?.isAudioEnabled ?? false);
   const [chaseCardName, setChaseCardName] = useState(persistedSession?.chaseCardName ?? '');
   const [chaseHitCard, setChaseHitCard] = useState<CardDto | null>(null);
 
@@ -102,6 +105,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       binderCards,
       boosterTypesBySetCode,
       chaseCardName,
+      isAudioEnabled,
       isFastMode,
       packHistory,
       revealMode,
@@ -114,6 +118,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     binderCards,
     boosterTypesBySetCode,
     chaseCardName,
+    isAudioEnabled,
     isFastMode,
     packHistory,
     revealMode,
@@ -227,6 +232,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     setSelectedCard(null);
     setRevealMode('all');
     setIsFastMode(false);
+    setIsAudioEnabled(false);
     setBoosterTypesBySetCode({});
     setSelectedSetCode(sets[0]?.setCode ?? DEFAULT_SET_CODE);
     setAppStep('start');
@@ -251,11 +257,32 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     }));
   }
 
+  function addChaseCard(chaseName: string) {
+    const normalizedName = chaseName.trim();
+    if (!normalizedName) {
+      return;
+    }
+
+    const existingNames = parseChaseNames(chaseCardName);
+    if (existingNames.some((name) => name.toLowerCase() === normalizedName.toLowerCase())) {
+      return;
+    }
+
+    setChaseCardName([...existingNames, normalizedName].join(', '));
+  }
+
+  function removeChaseCard(chaseName: string) {
+    const updatedNames = parseChaseNames(chaseCardName)
+      .filter((name) => name.toLowerCase() !== chaseName.toLowerCase());
+    setChaseCardName(updatedNames.join(', '));
+  }
+
   async function handleOpenPack() {
     if (!isEngineReady) {
       return;
     }
 
+    playFeedbackSound('pack', isAudioEnabled);
     setIsLoading(true);
     setIsOpeningWrapper(!isFastMode);
     setError(null);
@@ -301,21 +328,23 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const isEngineReady = engineStatus === 'ready';
   const canStartOpeningFlow = sets.length > 0;
   const normalizedChaseName = chaseCardName.trim().toLowerCase();
+  const chaseNames = parseChaseNames(chaseCardName);
 
   function completePack(openedPack: OpenedPackDto) {
+    const chasePull = findChaseCard(openedPack.cards, normalizedChaseName);
     setSummaryPack(openedPack);
     setSessionStats((currentStats) => updateSessionStats(currentStats, openedPack, selectedBooster.msrpUsd));
     setAllPulledCards((currentCards) => [...openedPack.cards, ...currentCards]);
     setBinderCards((currentCards) => updateBinderCards(currentCards, openedPack));
     setPackHistory((currentHistory) => [
-      createPackHistoryEntry(openedPack, selectedBoosterType, currentHistory.length + 1),
+      createPackHistoryEntry(openedPack, selectedBoosterType, currentHistory.length + 1, chasePull),
       ...currentHistory,
     ]);
     setHasCountedCurrentPack(true);
 
-    const chasePull = findChaseCard(openedPack.cards, normalizedChaseName);
     if (chasePull) {
       setChaseHitCard(chasePull);
+      playFeedbackSound('mythic', isAudioEnabled);
     }
   }
 
@@ -324,6 +353,8 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
       return;
     }
 
+    const nextCard = pack.cards[revealedCount];
+    playFeedbackSound(nextCard?.rarity === 'mythic' ? 'mythic' : 'flip', isAudioEnabled);
     setRevealedCount((count) => Math.min(count + 1, pack.cards.length));
   }
 
@@ -462,16 +493,52 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                     <p className="pb-2 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                       MSRP ${selectedBooster.msrpUsd.toFixed(2)}
                     </p>
-                    <label className="min-w-56 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                      Chase cards
-                      <input
-                        className="mt-1 block w-full rounded-md border border-white/10 bg-stone-950 px-3 py-2 text-sm font-semibold normal-case tracking-normal text-white outline-none transition placeholder:text-stone-600 focus:border-ember"
-                        onChange={(event) => setChaseCardName(event.target.value)}
-                        placeholder="Name or names"
-                        type="text"
-                        value={chaseCardName}
-                      />
-                    </label>
+                    <form
+                      className="min-w-64 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const formData = new FormData(event.currentTarget);
+                        addChaseCard(String(formData.get('chase-card') ?? ''));
+                        event.currentTarget.reset();
+                      }}
+                    >
+                      <label htmlFor="chase-card-input">Chase tracker</label>
+                      <div className="mt-1 flex gap-2">
+                        <input
+                          className="min-w-0 flex-1 rounded-md border border-white/10 bg-stone-950 px-3 py-2 text-sm font-semibold normal-case tracking-normal text-white outline-none transition placeholder:text-stone-600 focus:border-ember"
+                          id="chase-card-input"
+                          name="chase-card"
+                          placeholder="Add card name"
+                          type="text"
+                        />
+                        <button
+                          className="rounded-md border border-white/15 px-3 py-2 text-xs font-bold text-stone-200 transition hover:border-ember hover:text-ember"
+                          type="submit"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {chaseNames.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2 normal-case tracking-normal">
+                          {chaseNames.map((name) => (
+                            <span
+                              className="inline-flex items-center gap-2 rounded bg-emerald-400/10 px-2 py-1 text-xs font-semibold text-emerald-100"
+                              key={name}
+                            >
+                              {name}
+                              <button
+                                aria-label={`Remove ${name}`}
+                                className="font-black text-emerald-200 hover:text-white"
+                                onClick={() => removeChaseCard(name)}
+                                type="button"
+                              >
+                                x
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </form>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -555,6 +622,15 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                   />
                   Fast Mode
                 </label>
+                <label className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${isAudioEnabled ? 'bg-ember text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}>
+                  <input
+                    checked={isAudioEnabled}
+                    className="h-4 w-4 accent-ember"
+                    onChange={(event) => setIsAudioEnabled(event.target.checked)}
+                    type="checkbox"
+                  />
+                  SFX
+                </label>
                 {revealMode === 'one-by-one' && pack && revealPhase === 'revealing' && (
                   <>
                     <button
@@ -600,8 +676,21 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
           )}
 
           {chaseHitCard && (
-            <div className="mb-6 rounded-md border border-emerald-300/50 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100">
-              Chase hit: {chaseHitCard.name} (${chaseHitCard.priceUsd.toFixed(2)})
+            <div className="mb-6 rounded-lg border border-emerald-300/60 bg-emerald-400/10 px-5 py-4 shadow-[0_0_30px_rgba(52,211,153,0.12)]">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-200">Chase hit</p>
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xl font-black text-white">{chaseHitCard.name}</p>
+                  <p className="text-sm font-semibold text-emerald-100">${chaseHitCard.priceUsd.toFixed(2)}</p>
+                </div>
+                <button
+                  className="rounded-md border border-emerald-200/40 px-3 py-2 text-sm font-bold text-emerald-100 transition hover:border-emerald-100 hover:bg-emerald-300/10"
+                  onClick={() => setSelectedCard(chaseHitCard)}
+                  type="button"
+                >
+                  View card
+                </button>
+              </div>
             </div>
           )}
 
@@ -627,12 +716,21 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
             >
               History
             </button>
+            <button
+              className={`rounded-md px-4 py-2 text-sm font-semibold transition ${activeView === 'stats' ? 'bg-ember text-stone-950' : 'bg-white/[0.05] text-stone-300 hover:bg-white/10'}`}
+              onClick={() => setActiveView('stats')}
+              type="button"
+            >
+              Stats
+            </button>
           </div>
 
           {activeView === 'binder' ? (
             <BinderPage cards={allPulledCards} packHistory={packHistory} onSelectCard={setSelectedCard} />
           ) : activeView === 'history' ? (
             <PackHistoryPage entries={packHistory} onSelectCard={setSelectedCard} />
+          ) : activeView === 'stats' ? (
+            <AdvancedStatsPage entries={packHistory} stats={sessionStats} />
           ) : isOpeningWrapper ? (
             <section className="relative flex min-h-[28rem] items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[radial-gradient(circle_at_center,rgba(244,184,96,0.14),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015))] px-6 py-10 shadow-card">
               <div className="absolute inset-x-10 top-10 h-px bg-gradient-to-r from-transparent via-ember/50 to-transparent" />
@@ -744,10 +842,7 @@ function findChaseCard(cards: CardDto[], normalizedChaseName: string): CardDto |
     return null;
   }
 
-  const chaseNames = normalizedChaseName
-    .split(/[,;\n]/)
-    .map((name) => name.trim())
-    .filter(Boolean);
+  const chaseNames = parseChaseNames(normalizedChaseName);
 
   return cards.find((card) => {
     const normalizedCardName = card.name.toLowerCase();
@@ -763,16 +858,26 @@ function createPackHistoryEntry(
   pack: OpenedPackDto,
   boosterType: BoosterType,
   packNumber: number,
+  chasePull: CardDto | null,
 ): PackHistoryEntry {
   return {
     boosterType,
     cards: pack.cards,
+    chaseHitCardId: chasePull?.id,
+    chaseHitCardName: chasePull?.name,
     id: `${Date.now()}-${packNumber}`,
     openedAt: new Date().toISOString(),
     packNumber,
     setCode: pack.setCode,
     totalValueUsd: pack.totalValueUsd,
   };
+}
+
+function parseChaseNames(chaseCardName: string): string[] {
+  return chaseCardName
+    .split(/[,;\n]/)
+    .map((name) => name.trim())
+    .filter(Boolean);
 }
 
 function updateBinderCards(currentCards: CardDto[], pack: OpenedPackDto): CardDto[] {

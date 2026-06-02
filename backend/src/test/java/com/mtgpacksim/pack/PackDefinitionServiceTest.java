@@ -44,8 +44,8 @@ class PackDefinitionServiceTest {
             assertThat(slotCount(collectorDefinition)).isEqualTo(15);
             assertThat(collectorDefinition.slots())
                     .filteredOn(PackSlot::hasAlternatePool)
-                    .singleElement()
-                    .satisfies(slot -> assertThat(slot.count()).isEqualTo(5));
+                    .hasSize(2)
+                    .satisfies(slots -> assertThat(slots.stream().mapToInt(PackSlot::count).sum()).isEqualTo(5));
         }
     }
 

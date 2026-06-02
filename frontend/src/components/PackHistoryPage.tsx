@@ -33,6 +33,11 @@ export function PackHistoryPage({ entries, onSelectCard }: PackHistoryPageProps)
                 </p>
                 <h3 className="mt-1 text-xl font-bold text-white">${entry.totalValueUsd.toFixed(2)}</h3>
                 <p className="mt-1 text-sm text-stone-400">{new Date(entry.openedAt).toLocaleString()}</p>
+                {entry.chaseHitCardName && (
+                  <p className="mt-2 inline-flex rounded bg-emerald-400/10 px-2 py-1 text-xs font-black uppercase tracking-[0.14em] text-emerald-200">
+                    Chase hit: {entry.chaseHitCardName}
+                  </p>
+                )}
               </div>
               {bestCard && (
                 <button

@@ -1,12 +1,15 @@
 import type { BoosterType } from './packLabels';
 import type { CardDto, PackHistoryEntry, SessionStats } from './types/pack';
 
+export type PersistedActiveView = 'opener' | 'binder' | 'history' | 'stats';
+
 export type PersistedSessionState = {
-  activeView: 'opener' | 'binder' | 'history';
+  activeView: PersistedActiveView;
   allPulledCards: CardDto[];
   binderCards: CardDto[];
   boosterTypesBySetCode: Record<string, BoosterType>;
   chaseCardName: string;
+  isAudioEnabled: boolean;
   isFastMode: boolean;
   packHistory: PackHistoryEntry[];
   revealMode: 'all' | 'one-by-one';
@@ -48,6 +51,7 @@ export function loadPersistedSession(): PersistedSessionState | null {
       binderCards: parsedSession.binderCards ?? [],
       boosterTypesBySetCode: parsedSession.boosterTypesBySetCode ?? {},
       chaseCardName: parsedSession.chaseCardName ?? '',
+      isAudioEnabled: parsedSession.isAudioEnabled ?? false,
       isFastMode: parsedSession.isFastMode ?? false,
       packHistory: parsedSession.packHistory ?? [],
       revealMode: parsedSession.revealMode,

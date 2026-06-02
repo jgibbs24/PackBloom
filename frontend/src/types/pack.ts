@@ -15,6 +15,8 @@ export type OpenedPackDto = {
 export type PackHistoryEntry = {
   boosterType: string;
   cards: CardDto[];
+  chaseHitCardId?: string;
+  chaseHitCardName?: string;
   id: string;
   openedAt: string;
   packNumber: number;

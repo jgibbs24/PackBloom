@@ -47,8 +47,8 @@ class PackOpeningServiceTest {
         OpenedPackDto pack = service.openPack("blb", "collector");
 
         assertThat(pack.cards()).hasSize(15);
-        assertThat(pack.cards()).filteredOn(card -> card.rarity().equals("common")).hasSize(4);
-        assertThat(pack.cards()).filteredOn(card -> card.rarity().equals("uncommon")).hasSize(5);
+        assertThat(pack.cards()).filteredOn(card -> card.rarity().equals("common")).hasSize(5);
+        assertThat(pack.cards()).filteredOn(card -> card.rarity().equals("uncommon")).hasSize(4);
         assertThat(pack.cards()).filteredOn(card -> card.rarity().equals("basic")).hasSize(1);
         assertThat(pack.cards())
                 .filteredOn(card -> card.rarity().equals("rare") || card.rarity().equals("mythic"))
@@ -69,10 +69,10 @@ class PackOpeningServiceTest {
     void warmUpPackLoadsAllFixedAndAlternatePools() {
         service.warmUpPack("blb", "collector");
 
-        verify(scryfallClient).searchCards("set:blb rarity:common -type:basic");
-        verify(scryfallClient).searchCards("set:blb rarity:uncommon");
-        verify(scryfallClient).searchCards("set:blb rarity:rare");
-        verify(scryfallClient).searchCards("set:blb rarity:mythic");
+        verify(scryfallClient).searchCards("set:blb rarity:common is:booster -type:basic");
+        verify(scryfallClient).searchCards("set:blb rarity:uncommon is:booster");
+        verify(scryfallClient).searchCards("set:blb rarity:rare is:booster");
+        verify(scryfallClient).searchCards("set:blb rarity:mythic is:booster");
         verify(scryfallClient).searchCards("set:blb type:basic");
     }
 

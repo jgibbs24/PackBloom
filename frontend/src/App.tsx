@@ -28,11 +28,11 @@ export default function App() {
             Built by Jameson Gibbs |{' '}
             <a
               className="text-ember underline-offset-4 transition hover:text-yellow-300 hover:underline"
-              href="https://github.com/jgibbs24"
+              href="https://github.com/jgibbs24/PackBloom"
               rel="noreferrer"
               target="_blank"
             >
-              https://github.com/jgibbs24
+              jgibbs24/PackBloom
             </a>
           </p>
         </header>
