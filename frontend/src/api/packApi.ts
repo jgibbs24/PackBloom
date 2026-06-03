@@ -3,7 +3,7 @@ import type { OpenedPackDto, SupportedSetDto } from '../types/pack';
 import { apiUrl } from './apiUrl';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
-const PACK_OPENING_TIMEOUT_MS = 30000;
+const PACK_OPENING_TIMEOUT_MS = 90000;
 
 export type WarmupStatusDto = {
   boosterType: BoosterType;
