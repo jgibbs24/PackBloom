@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { openPack } from '../api/packApi';
 import { playFeedbackSound } from '../audioFeedback';
 import { formatCardPrice } from '../cardPrice';
-import type { BoosterType } from '../packLabels';
+import { getBoosterOption, type BoosterType } from '../packLabels';
 import type { CardDto, OpenedPackDto, SupportedSetDto } from '../types/pack';
 import { PackWrapper } from './PackWrapper';
 import type { SetTheme } from '../setThemes';
@@ -43,6 +43,21 @@ type BattleSessionStats = {
   ties: number;
 };
 
+type BattleHistoryEntry = {
+  bestCardA: CardDto | null;
+  bestCardB: CardDto | null;
+  boosterType: BoosterType;
+  id: string;
+  margin: number;
+  playerAName: string;
+  playerBName: string;
+  setCode: string;
+  setName: string;
+  totalA: number;
+  totalB: number;
+  winner: BattleSide | 'tie';
+};
+
 const initialBattleStats: BattleSessionStats = {
   battles: 0,
   biggestWinMargin: 0,
@@ -76,6 +91,7 @@ export function PackBattlePage({
   const [revealedCount, setRevealedCount] = useState(0);
   const [hasCountedBattle, setHasCountedBattle] = useState(false);
   const [battleStats, setBattleStats] = useState<BattleSessionStats>(initialBattleStats);
+  const [battleHistory, setBattleHistory] = useState<BattleHistoryEntry[]>([]);
 
   const winner = useMemo(() => {
     if (!battleResult) {
@@ -143,6 +159,17 @@ export function PackBattlePage({
     }
 
     setBattleStats((currentStats) => updateBattleStats(currentStats, packA, packB));
+    setBattleHistory((currentHistory) => [
+      createBattleHistoryEntry(
+        packA,
+        packB,
+        normalizePlayerName(playerAName, 'Player 1'),
+        normalizePlayerName(playerBName, 'Player 2'),
+        selectedSet,
+        boosterType,
+      ),
+      ...currentHistory,
+    ]);
     setHasCountedBattle(true);
   }
 
@@ -311,6 +338,10 @@ export function PackBattlePage({
           playerAName={normalizePlayerName(playerAName, 'Player 1')}
           playerBName={normalizePlayerName(playerBName, 'Player 2')}
           stats={battleStats}
+          onResetStats={() => {
+            setBattleStats(initialBattleStats);
+            setBattleHistory([]);
+          }}
         />
 
         {battleResult ? (
@@ -331,6 +362,7 @@ export function PackBattlePage({
                 packB={battleResult.packB}
                 playerAName={battleResult.playerAName}
                 playerBName={battleResult.playerBName}
+                onStartNewBattle={handleStartBattle}
                 winner={winner}
               />
             )}
@@ -356,6 +388,7 @@ export function PackBattlePage({
                 visibleCards={visibleCardsB}
               />
             </div>
+            <BattleHistoryPanel history={battleHistory} />
           </section>
         ) : (
           <section className="flex min-h-[28rem] items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/[0.03] px-6 text-center text-stone-400">
@@ -372,28 +405,39 @@ function BattleWinnerBanner({
   packB,
   playerAName,
   playerBName,
+  onStartNewBattle,
   winner,
 }: {
   packA: OpenedPackDto;
   packB: OpenedPackDto;
   playerAName: string;
   playerBName: string;
+  onStartNewBattle: () => void;
   winner: BattleSide | 'tie' | null;
 }) {
   const valueDifference = Math.abs(packA.totalValueUsd - packB.totalValueUsd);
   const winnerName = winner === 'A' ? playerAName : playerBName;
 
   return (
-    <div className="rounded-lg border border-ember/35 bg-ember/10 px-5 py-4 shadow-[0_0_30px_rgba(244,184,96,0.12)]">
-      <p className="text-xs font-black uppercase tracking-[0.22em] text-ember">Battle result</p>
-      <h3 className="mt-2 text-3xl font-black text-white">
-        {winner === 'tie' ? 'Draw' : `${winnerName} wins`}
-      </h3>
-      <p className="mt-1 text-sm font-semibold text-amber-100">
-        {winner === 'tie'
-          ? 'Both packs landed on the same total value.'
-          : `Won by $${valueDifference.toFixed(2)}.`}
-      </p>
+    <div className="flex flex-col gap-4 rounded-lg border border-ember/35 bg-ember/10 px-5 py-4 shadow-[0_0_30px_rgba(244,184,96,0.12)] sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-ember">Battle complete</p>
+        <h3 className="mt-2 text-3xl font-black text-white">
+          {winner === 'tie' ? 'Draw' : `${winnerName} wins`}
+        </h3>
+        <p className="mt-1 text-sm font-semibold text-amber-100">
+          {winner === 'tie'
+            ? 'Both packs landed on the same total value.'
+            : `Won by $${valueDifference.toFixed(2)}.`}
+        </p>
+      </div>
+      <button
+        className="w-fit rounded-md bg-ember px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] text-stone-950 transition hover:bg-yellow-300"
+        onClick={onStartNewBattle}
+        type="button"
+      >
+        New battle
+      </button>
     </div>
   );
 }
@@ -429,9 +473,6 @@ function BattlePackPanel({
           <div>
             <p className="text-xs font-black uppercase tracking-[0.2em] text-stone-500">{playerName}</p>
             <h3 className="mt-1 text-2xl font-black text-white">${runningTotal.toFixed(2)}</h3>
-            <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em] text-stone-500">
-              Final ${pack.totalValueUsd.toFixed(2)}
-            </p>
           </div>
           {isWinner && (
             <span className="rounded bg-ember px-2 py-1 text-xs font-black uppercase tracking-[0.14em] text-stone-950">
@@ -565,10 +606,12 @@ function BattleRevealControls({
 }
 
 function BattleStatsPanel({
+  onResetStats,
   playerAName,
   playerBName,
   stats,
 }: {
+  onResetStats: () => void;
   playerAName: string;
   playerBName: string;
   stats: BattleSessionStats;
@@ -577,12 +620,81 @@ function BattleStatsPanel({
   const playerBWinRate = stats.battles > 0 ? (stats.playerBWins / stats.battles) * 100 : 0;
 
   return (
-    <section className="mb-6 grid gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-4 shadow-card sm:grid-cols-2 lg:grid-cols-4">
-      <BattleStat label={`${playerAName} wins`} value={`${stats.playerAWins} (${playerAWinRate.toFixed(0)}%)`} />
-      <BattleStat label={`${playerBName} wins`} value={`${stats.playerBWins} (${playerBWinRate.toFixed(0)}%)`} />
-      <BattleStat label="Best pack" value={`$${stats.bestPackValue.toFixed(2)}`} />
-      <BattleStat label="Biggest margin" value={`$${stats.biggestWinMargin.toFixed(2)}`} />
+    <section className="mb-6 rounded-lg border border-white/10 bg-white/[0.035] p-4 shadow-card">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-ember">Battle session</p>
+        <button
+          className="rounded-md border border-white/15 bg-white/[0.05] px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-stone-100 transition hover:border-white/35 hover:bg-white/10"
+          onClick={onResetStats}
+          type="button"
+        >
+          Reset stats
+        </button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <BattleStat label={`${playerAName} wins`} value={`${stats.playerAWins} (${playerAWinRate.toFixed(0)}%)`} />
+        <BattleStat label={`${playerBName} wins`} value={`${stats.playerBWins} (${playerBWinRate.toFixed(0)}%)`} />
+        <BattleStat label="Best pack" value={`$${stats.bestPackValue.toFixed(2)}`} />
+        <BattleStat label="Biggest margin" value={`$${stats.biggestWinMargin.toFixed(2)}`} />
+      </div>
     </section>
+  );
+}
+
+function BattleHistoryPanel({ history }: { history: BattleHistoryEntry[] }) {
+  if (history.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-lg border border-white/10 bg-white/[0.035] p-4 shadow-card">
+      <p className="text-xs font-black uppercase tracking-[0.2em] text-ember">Battle history</p>
+      <div className="mt-4 space-y-3">
+        {history.map((entry) => {
+          const winnerName = entry.winner === 'A'
+            ? entry.playerAName
+            : entry.winner === 'B'
+              ? entry.playerBName
+              : 'Draw';
+          const boosterLabel = getBoosterOption(entry.boosterType).label;
+
+          return (
+            <article className="rounded-md border border-white/10 bg-black/20 p-4" key={entry.id}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                    {entry.setCode.toUpperCase()} / {boosterLabel}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black text-white">
+                    {entry.winner === 'tie' ? 'Draw' : `${winnerName} won by $${entry.margin.toFixed(2)}`}
+                  </h3>
+                  <p className="mt-1 text-sm font-semibold text-stone-400">{entry.setName}</p>
+                </div>
+                <div className="text-left text-sm font-semibold text-stone-300 sm:text-right">
+                  <p>{entry.playerAName}: ${entry.totalA.toFixed(2)}</p>
+                  <p>{entry.playerBName}: ${entry.totalB.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                <BattleHistoryBestPull label={`${entry.playerAName} best`} card={entry.bestCardA} />
+                <BattleHistoryBestPull label={`${entry.playerBName} best`} card={entry.bestCardB} />
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function BattleHistoryBestPull({ card, label }: { card: CardDto | null; label: string }) {
+  return (
+    <div className="rounded bg-white/[0.04] p-3">
+      <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-stone-500">{label}</p>
+      <p className="mt-1 line-clamp-2 font-semibold text-white">
+        {card ? `${card.name} ${formatCardPrice(card)}` : 'None'}
+      </p>
+    </div>
   );
 }
 
@@ -630,6 +742,32 @@ function updateBattleStats(
     playerAWins: currentStats.playerAWins + (winner === 'A' ? 1 : 0),
     playerBWins: currentStats.playerBWins + (winner === 'B' ? 1 : 0),
     ties: currentStats.ties + (winner === 'tie' ? 1 : 0),
+  };
+}
+
+function createBattleHistoryEntry(
+  packA: OpenedPackDto,
+  packB: OpenedPackDto,
+  playerAName: string,
+  playerBName: string,
+  selectedSet: SupportedSetDto | undefined,
+  boosterType: BoosterType,
+): BattleHistoryEntry {
+  const winner = getBattleWinner(packA.totalValueUsd, packB.totalValueUsd);
+
+  return {
+    bestCardA: findBestCard(packA.cards),
+    bestCardB: findBestCard(packB.cards),
+    boosterType,
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    margin: Math.abs(packA.totalValueUsd - packB.totalValueUsd),
+    playerAName,
+    playerBName,
+    setCode: selectedSet?.setCode ?? packA.setCode,
+    setName: selectedSet?.setName ?? packA.setCode.toUpperCase(),
+    totalA: packA.totalValueUsd,
+    totalB: packB.totalValueUsd,
+    winner,
   };
 }
 
