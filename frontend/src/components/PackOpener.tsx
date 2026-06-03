@@ -30,6 +30,7 @@ const LANDING_FALLBACK_SET: SupportedSetDto = {
   setCode: DEFAULT_SET_CODE,
   setName: 'Bloomburrow',
 };
+const LANDING_FEATURES = ['Pack Battle', 'Binder', 'History', 'Chase Tracker'];
 type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
 type ActiveView = 'opener' | 'binder' | 'history';
@@ -529,6 +530,16 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
                     Could not load supported sets. Try refreshing in a moment.
                   </p>
                 )}
+              </div>
+              <div className="mt-7 flex max-w-2xl flex-wrap gap-2">
+                {LANDING_FEATURES.map((feature) => (
+                  <span
+                    className="rounded border border-white/10 bg-black/20 px-3 py-2 text-[0.68rem] font-black uppercase tracking-[0.16em] text-stone-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                    key={feature}
+                  >
+                    {feature}
+                  </span>
+                ))}
               </div>
             </div>
 

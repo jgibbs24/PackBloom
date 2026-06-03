@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { openPack } from '../api/packApi';
 import { playFeedbackSound } from '../audioFeedback';
 import { formatCardPrice } from '../cardPrice';
@@ -66,6 +66,8 @@ const initialBattleStats: BattleSessionStats = {
   playerBWins: 0,
   ties: 0,
 };
+const BATTLE_SESSION_STORAGE_KEY = 'packbloom-battle-session-v1';
+const BATTLE_HISTORY_LIMIT = 30;
 
 export function PackBattlePage({
   audioVolume,
@@ -90,8 +92,13 @@ export function PackBattlePage({
   const [battleRevealMode, setBattleRevealMode] = useState<BattleRevealMode>('all');
   const [revealedCount, setRevealedCount] = useState(0);
   const [hasCountedBattle, setHasCountedBattle] = useState(false);
-  const [battleStats, setBattleStats] = useState<BattleSessionStats>(initialBattleStats);
-  const [battleHistory, setBattleHistory] = useState<BattleHistoryEntry[]>([]);
+  const persistedBattleSession = useMemo(() => loadPersistedBattleSession(), []);
+  const [battleStats, setBattleStats] = useState<BattleSessionStats>(
+    persistedBattleSession?.battleStats ?? initialBattleStats,
+  );
+  const [battleHistory, setBattleHistory] = useState<BattleHistoryEntry[]>(
+    persistedBattleSession?.battleHistory ?? [],
+  );
 
   const winner = useMemo(() => {
     if (!battleResult) {
@@ -108,9 +115,16 @@ export function PackBattlePage({
   const visibleCardsB = battleResult?.packB.cards.slice(0, revealedCount) ?? [];
   const runningTotalA = sumCardPrices(visibleCardsA);
   const runningTotalB = sumCardPrices(visibleCardsB);
+  const isOneByOneBattleActive = Boolean(
+    battleResult && battleRevealMode === 'one-by-one' && !hasRevealedEveryCard,
+  );
+
+  useEffect(() => {
+    savePersistedBattleSession({ battleHistory, battleStats });
+  }, [battleHistory, battleStats]);
 
   async function handleStartBattle() {
-    if (!isEngineReady || !selectedSet) {
+    if (!isEngineReady || !selectedSet || isOneByOneBattleActive) {
       return;
     }
 
@@ -169,7 +183,7 @@ export function PackBattlePage({
         boosterType,
       ),
       ...currentHistory,
-    ]);
+    ].slice(0, BATTLE_HISTORY_LIMIT));
     setHasCountedBattle(true);
   }
 
@@ -260,11 +274,17 @@ export function PackBattlePage({
               </label>
               <button
                 className="rounded-md bg-ember px-5 py-3 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-                disabled={!isEngineReady || isLoading}
+                disabled={!isEngineReady || isLoading || isOneByOneBattleActive}
                 onClick={handleStartBattle}
                 type="button"
               >
-                {isLoading ? 'Battling...' : isEngineReady ? 'Start Battle' : 'Engine Waking'}
+                {isLoading
+                  ? 'Battling...'
+                  : isOneByOneBattleActive
+                    ? 'Finish Reveal First'
+                    : isEngineReady
+                      ? 'Start Battle'
+                      : 'Engine Waking'}
               </button>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -341,6 +361,7 @@ export function PackBattlePage({
           onResetStats={() => {
             setBattleStats(initialBattleStats);
             setBattleHistory([]);
+            clearPersistedBattleSession();
           }}
         />
 
@@ -362,7 +383,6 @@ export function PackBattlePage({
                 packB={battleResult.packB}
                 playerAName={battleResult.playerAName}
                 playerBName={battleResult.playerBName}
-                onStartNewBattle={handleStartBattle}
                 winner={winner}
               />
             )}
@@ -388,13 +408,15 @@ export function PackBattlePage({
                 visibleCards={visibleCardsB}
               />
             </div>
-            <BattleHistoryPanel history={battleHistory} />
           </section>
         ) : (
           <section className="flex min-h-[28rem] items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/[0.03] px-6 text-center text-stone-400">
             Start a battle to open two packs side by side.
           </section>
         )}
+        <div className="mt-6">
+          <BattleHistoryPanel history={battleHistory} />
+        </div>
       </div>
     </div>
   );
@@ -405,21 +427,19 @@ function BattleWinnerBanner({
   packB,
   playerAName,
   playerBName,
-  onStartNewBattle,
   winner,
 }: {
   packA: OpenedPackDto;
   packB: OpenedPackDto;
   playerAName: string;
   playerBName: string;
-  onStartNewBattle: () => void;
   winner: BattleSide | 'tie' | null;
 }) {
   const valueDifference = Math.abs(packA.totalValueUsd - packB.totalValueUsd);
   const winnerName = winner === 'A' ? playerAName : playerBName;
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-ember/35 bg-ember/10 px-5 py-4 shadow-[0_0_30px_rgba(244,184,96,0.12)] sm:flex-row sm:items-center sm:justify-between">
+    <div className="rounded-lg border border-ember/35 bg-ember/10 px-5 py-4 shadow-[0_0_30px_rgba(244,184,96,0.12)]">
       <div>
         <p className="text-xs font-black uppercase tracking-[0.22em] text-ember">Battle complete</p>
         <h3 className="mt-2 text-3xl font-black text-white">
@@ -428,16 +448,9 @@ function BattleWinnerBanner({
         <p className="mt-1 text-sm font-semibold text-amber-100">
           {winner === 'tie'
             ? 'Both packs landed on the same total value.'
-            : `Won by $${valueDifference.toFixed(2)}.`}
+          : `Won by $${valueDifference.toFixed(2)}.`}
         </p>
       </div>
-      <button
-        className="w-fit rounded-md bg-ember px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] text-stone-950 transition hover:bg-yellow-300"
-        onClick={onStartNewBattle}
-        type="button"
-      >
-        New battle
-      </button>
     </div>
   );
 }
@@ -769,6 +782,74 @@ function createBattleHistoryEntry(
     totalB: packB.totalValueUsd,
     winner,
   };
+}
+
+function loadPersistedBattleSession(): {
+  battleHistory: BattleHistoryEntry[];
+  battleStats: BattleSessionStats;
+} | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const rawSession = window.localStorage.getItem(BATTLE_SESSION_STORAGE_KEY);
+    if (!rawSession) {
+      return null;
+    }
+
+    const parsedSession = JSON.parse(rawSession) as Partial<{
+      battleHistory: BattleHistoryEntry[];
+      battleStats: BattleSessionStats;
+    }>;
+
+    return {
+      battleHistory: Array.isArray(parsedSession.battleHistory)
+        ? parsedSession.battleHistory.slice(0, BATTLE_HISTORY_LIMIT)
+        : [],
+      battleStats: isBattleSessionStats(parsedSession.battleStats)
+        ? parsedSession.battleStats
+        : initialBattleStats,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedBattleSession(session: {
+  battleHistory: BattleHistoryEntry[];
+  battleStats: BattleSessionStats;
+}) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(BATTLE_SESSION_STORAGE_KEY, JSON.stringify({
+    battleHistory: session.battleHistory.slice(0, BATTLE_HISTORY_LIMIT),
+    battleStats: session.battleStats,
+  }));
+}
+
+function clearPersistedBattleSession() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(BATTLE_SESSION_STORAGE_KEY);
+}
+
+function isBattleSessionStats(stats: unknown): stats is BattleSessionStats {
+  if (!stats || typeof stats !== 'object') {
+    return false;
+  }
+
+  const maybeStats = stats as Partial<BattleSessionStats>;
+  return typeof maybeStats.battles === 'number'
+    && typeof maybeStats.biggestWinMargin === 'number'
+    && typeof maybeStats.bestPackValue === 'number'
+    && typeof maybeStats.playerAWins === 'number'
+    && typeof maybeStats.playerBWins === 'number'
+    && typeof maybeStats.ties === 'number';
 }
 
 function findBestCard(cards: CardDto[]): CardDto | null {
