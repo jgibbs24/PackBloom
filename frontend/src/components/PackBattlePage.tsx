@@ -123,7 +123,10 @@ export function PackBattlePage({
       if (battleRevealMode === 'all') {
         completeBattle(packA, packB, false);
       }
-      if (packA.cards.some((card) => card.rarity === 'mythic') || packB.cards.some((card) => card.rarity === 'mythic')) {
+      if (
+        battleRevealMode === 'all'
+        && (packA.cards.some((card) => card.rarity === 'mythic') || packB.cards.some((card) => card.rarity === 'mythic'))
+      ) {
         playFeedbackSound('mythic', canPlaySfx, audioVolume);
       }
     } catch (caughtError) {
@@ -156,18 +159,14 @@ export function PackBattlePage({
 
     const hasMythic = nextCards.some((card) => card.rarity === 'mythic');
     playFeedbackSound(hasMythic ? 'mythic' : 'flip', canPlaySfx, audioVolume);
-    setRevealedCount((currentCount) => Math.min(currentCount + 1, maxRevealCount));
+    const nextCount = Math.min(revealedCount + 1, maxRevealCount);
+    setRevealedCount(nextCount);
+    if (nextCount >= maxRevealCount) {
+      completeBattle(battleResult.packA, battleResult.packB);
+    }
   }
 
   function revealRemainingPairs() {
-    if (!battleResult) {
-      return;
-    }
-
-    setRevealedCount(maxRevealCount);
-  }
-
-  function finishRevealedBattle() {
     if (!battleResult) {
       return;
     }
@@ -320,9 +319,9 @@ export function PackBattlePage({
               <BattleRevealControls
                 hasRevealedEveryCard={hasRevealedEveryCard}
                 maxRevealCount={maxRevealCount}
-                onFinishBattle={finishRevealedBattle}
                 onRevealNext={revealNextPair}
                 onRevealRemaining={revealRemainingPairs}
+                onStartNewBattle={handleStartBattle}
                 revealedCount={revealedCount}
               />
             )}
@@ -341,6 +340,7 @@ export function PackBattlePage({
                 onSelectCard={onSelectCard}
                 pack={battleResult.packA}
                 playerName={battleResult.playerAName}
+                revealMode={battleRevealMode}
                 runningTotal={runningTotalA}
                 side="A"
                 visibleCards={visibleCardsA}
@@ -350,6 +350,7 @@ export function PackBattlePage({
                 onSelectCard={onSelectCard}
                 pack={battleResult.packB}
                 playerName={battleResult.playerBName}
+                revealMode={battleRevealMode}
                 runningTotal={runningTotalB}
                 side="B"
                 visibleCards={visibleCardsB}
@@ -402,6 +403,7 @@ function BattlePackPanel({
   onSelectCard,
   pack,
   playerName,
+  revealMode,
   runningTotal,
   side,
   visibleCards,
@@ -410,6 +412,7 @@ function BattlePackPanel({
   onSelectCard: (card: CardDto) => void;
   pack: OpenedPackDto;
   playerName: string;
+  revealMode: BattleRevealMode;
   runningTotal: number;
   side: BattleSide;
   visibleCards: CardDto[];
@@ -417,6 +420,7 @@ function BattlePackPanel({
   const bestCard = findBestCard(visibleCards);
   const mythicCount = visibleCards.filter((card) => card.rarity === 'mythic').length;
   const rareCount = visibleCards.filter((card) => card.rarity === 'rare').length;
+  const currentCard = visibleCards.length > 0 ? visibleCards[visibleCards.length - 1] : undefined;
 
   return (
     <article className={`rounded-lg border bg-stone-950/70 shadow-card ${isWinner ? 'border-ember' : 'border-white/10'}`}>
@@ -441,26 +445,68 @@ function BattlePackPanel({
           <BattleStat label="Mythics" value={String(mythicCount)} />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
-        {visibleCards.map((card, index) => (
-          <button
-            aria-label={`View ${card.name}`}
-            className="group overflow-hidden rounded-lg border border-white/10 bg-stone-900 text-left transition hover:-translate-y-0.5 hover:border-ember focus:border-ember focus:outline-none"
-            key={`${side}-${card.id}-${index}`}
-            onClick={() => onSelectCard(card)}
-            type="button"
-          >
-            <img alt={card.name} className="aspect-[488/680] w-full object-cover" loading="lazy" src={card.imageUrl} />
-            <div className="space-y-1 p-2">
-              <p className="line-clamp-2 min-h-8 text-xs font-semibold leading-4 text-white">{card.name}</p>
-              <div className="flex items-center justify-between gap-2 text-[0.68rem]">
-                <span className="font-bold uppercase tracking-[0.12em] text-stone-400">{card.rarity}</span>
-                <span className="font-semibold text-violet-100">{formatCardPrice(card)}</span>
-              </div>
+      {revealMode === 'one-by-one' ? (
+        <div className="p-4">
+          {currentCard ? (
+            <div className="mx-auto max-w-[18rem]">
+              <button
+                aria-label={`View ${currentCard.name}`}
+                className="group relative block w-full pt-5 text-left focus:outline-none"
+                onClick={() => onSelectCard(currentCard)}
+                type="button"
+              >
+                <div className="absolute left-7 right-7 top-0 h-full rotate-[-5deg] rounded-lg border border-white/10 bg-stone-900/70 shadow-card" />
+                <div className="absolute left-4 right-4 top-2 h-full rotate-[4deg] rounded-lg border border-white/10 bg-stone-900/80 shadow-card" />
+                <div className="relative overflow-hidden rounded-lg border border-white/10 bg-stone-900 shadow-card transition group-hover:-translate-y-1 group-hover:border-ember">
+                  <img
+                    alt={currentCard.name}
+                    className="aspect-[488/680] w-full object-cover"
+                    loading="lazy"
+                    src={currentCard.imageUrl}
+                  />
+                  <div className="space-y-2 p-3">
+                    <p className="line-clamp-2 text-base font-bold leading-5 text-white">{currentCard.name}</p>
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-bold uppercase tracking-[0.12em] text-stone-400">{currentCard.rarity}</span>
+                      <span className="rounded bg-violet-500/70 px-2 py-1 font-bold text-violet-50">
+                        {formatCardPrice(currentCard)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+              <p className="mt-4 text-center text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                {visibleCards.length} cards revealed
+              </p>
             </div>
-          </button>
-        ))}
-      </div>
+          ) : (
+            <div className="flex min-h-[22rem] items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/[0.03] text-sm font-semibold text-stone-500">
+              Waiting for reveal
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
+          {visibleCards.map((card, index) => (
+            <button
+              aria-label={`View ${card.name}`}
+              className="group overflow-hidden rounded-lg border border-white/10 bg-stone-900 text-left transition hover:-translate-y-0.5 hover:border-ember focus:border-ember focus:outline-none"
+              key={`${side}-${card.id}-${index}`}
+              onClick={() => onSelectCard(card)}
+              type="button"
+            >
+              <img alt={card.name} className="aspect-[488/680] w-full object-cover" loading="lazy" src={card.imageUrl} />
+              <div className="space-y-1 p-2">
+                <p className="line-clamp-2 min-h-8 text-xs font-semibold leading-4 text-white">{card.name}</p>
+                <div className="flex items-center justify-between gap-2 text-[0.68rem]">
+                  <span className="font-bold uppercase tracking-[0.12em] text-stone-400">{card.rarity}</span>
+                  <span className="font-semibold text-violet-100">{formatCardPrice(card)}</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </article>
   );
 }
@@ -468,16 +514,16 @@ function BattlePackPanel({
 function BattleRevealControls({
   hasRevealedEveryCard,
   maxRevealCount,
-  onFinishBattle,
   onRevealNext,
   onRevealRemaining,
+  onStartNewBattle,
   revealedCount,
 }: {
   hasRevealedEveryCard: boolean;
   maxRevealCount: number;
-  onFinishBattle: () => void;
   onRevealNext: () => void;
   onRevealRemaining: () => void;
+  onStartNewBattle: () => void;
   revealedCount: number;
 }) {
   return (
@@ -508,10 +554,10 @@ function BattleRevealControls({
       {hasRevealedEveryCard && (
         <button
           className="rounded-md bg-emerald-400 px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] text-stone-950 transition hover:bg-emerald-300"
-          onClick={onFinishBattle}
+          onClick={onStartNewBattle}
           type="button"
         >
-          Finish battle
+          New battle
         </button>
       )}
     </div>
