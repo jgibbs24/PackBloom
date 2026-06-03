@@ -14,7 +14,7 @@ const modes: Array<{
 }> = [
   {
     background:
-      'radial-gradient(circle at 18% 20%, rgba(244,184,96,0.28), transparent 28%), radial-gradient(circle at 82% 72%, rgba(139,92,246,0.22), transparent 30%), linear-gradient(135deg, rgba(244,184,96,0.10), rgba(255,255,255,0.035) 45%, rgba(0,0,0,0.35))',
+      'linear-gradient(135deg, rgba(244,184,96,0.18), rgba(255,255,255,0.035) 42%, rgba(0,0,0,0.44)), linear-gradient(90deg, rgba(244,184,96,0.20), transparent 58%)',
     description: 'Crack packs, chase hits, and grow your collection.',
     eyebrow: 'Classic',
     mode: 'opener',
@@ -22,7 +22,7 @@ const modes: Array<{
   },
   {
     background:
-      'radial-gradient(circle at 22% 75%, rgba(248,113,113,0.22), transparent 30%), radial-gradient(circle at 82% 18%, rgba(96,165,250,0.24), transparent 28%), linear-gradient(135deg, rgba(255,255,255,0.04), rgba(244,184,96,0.10) 48%, rgba(0,0,0,0.36))',
+      'linear-gradient(135deg, rgba(104,64,165,0.24), rgba(255,255,255,0.04) 42%, rgba(0,0,0,0.44)), linear-gradient(90deg, rgba(244,184,96,0.16), transparent 58%)',
     description: 'Face off against a friend and see who comes out on top.',
     eyebrow: 'Versus',
     mode: 'battle',
@@ -55,8 +55,10 @@ export function ModeSelector({ onBack, onSelectMode }: ModeSelectorProps) {
             style={{ background: mode.background }}
             type="button"
           >
-            <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.10),transparent_34%,rgba(0,0,0,0.24)_72%)] opacity-80" />
-            <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full border border-white/10" />
+            <div className="absolute inset-4 rounded-[0.35rem] border border-white/[0.07]" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0_24%,rgba(255,255,255,0.09)_24.2%,transparent_24.7%),linear-gradient(90deg,transparent_0_63%,rgba(255,255,255,0.08)_63.2%,transparent_63.7%),linear-gradient(0deg,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[length:100%_100%,100%_100%,100%_5rem] opacity-60" />
+            <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent_0_28%,rgba(255,255,255,0.16)_38%,transparent_49%),repeating-linear-gradient(135deg,rgba(255,255,255,0.07)_0_1px,transparent_1px_18px)] opacity-25 transition group-hover:opacity-45" />
+            <div className="absolute left-6 top-6 h-12 w-12 border-l border-t border-ember/45" />
             <div className="absolute bottom-6 right-6 h-16 w-16 border-b border-r border-ember/40" />
             <div className="relative z-10 flex min-h-[17rem] flex-col">
               <p className="text-xs font-black uppercase tracking-[0.22em] text-ember">{mode.eyebrow}</p>
