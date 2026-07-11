@@ -1,58 +1,96 @@
 # PackBloom
 
-A full-stack Magic: The Gathering pack-opening simulator. The app lets you choose a supported set, move through a small landing/set-selection/opening flow, open a simplified play-booster-style pack, reveal cards all at once or one by one, and track session stats like pack value, best pull, mythics pulled, and net profit/loss.
+PackBloom is a full-stack Magic: The Gathering pack-opening simulator. It lets you choose a supported set, pick a booster type, open packs with real wrapper art, reveal cards all at once or one by one, track pulls and value, and play a head-to-head Pack Battle mode.
 
-The project is currently built as a local development monorepo:
+Live app:
+
+```text
+https://packbloom.vercel.app
+```
+
+Repository:
+
+```text
+https://github.com/jgibbs24/PackBloom
+```
+
+## Project Structure
 
 ```text
 backend/   Spring Boot API
 frontend/  React + TypeScript + Vite UI
 ```
 
-Current release tag:
-
-```text
-v1.1.0 - Themed pack selection flow and pack type UI
-```
-
 ## Current Features
 
-- Open MTG packs from a React frontend backed by a Spring Boot API.
-- Live Scryfall integration for card data, images, rarities, and prices.
-- In-memory backend card-pool caching by set and slot, such as `blb:common` and `blb:rare`.
-- Landing page with a rotating themed pack wrapper preview.
-- Dedicated set-selection screen with set cards.
-- Real pack wrapper image assets for each supported set and booster type.
-- Supported set metadata powered by `GET /api/sets`.
-- Generic pack-opening endpoint: `GET /api/packs/{setCode}/open`.
-- Barebones play-booster style composition:
-  - 10 commons
-  - 3 uncommons
-  - 1 rare or mythic
-  - 1 land
-- Mythic upgrade chance of roughly 12.5%.
-- Frontend pack type selector with:
+- Landing page with rotating real pack wrapper art.
+- Mode selection for:
+  - Open Packs
+  - Pack Battle
+- Set selection screen with per-set booster type choices.
+- Supported booster types:
   - Play Booster
   - Collector Booster
-- Backend pack opening supports `play` and simplified `collector` booster definitions.
-- Backend set metadata includes MSRP for play boosters.
-- Frontend MSRP display and session spend/profit calculations update from the selected pack type.
-- Reveal modes:
+- Real optimized WebP pack wrapper assets for each supported set and booster type.
+- Live Scryfall integration for card data, images, rarities, and prices.
+- Backend card-pool caching and warmup endpoints to reduce slow first opens.
+- Pack reveal modes:
   - Reveal all
-  - Cinematic one-by-one reveal stack
-- One-by-one reveal prevents opening a new pack until the current reveal is completed.
-- Click any revealed card to view a larger preview.
-- Rarity-colored hover borders for cards.
-- Session-only binder page showing best pulls.
-- Animated currency values for pack summary and session stats.
-- Frontend-only session stats:
+  - One-by-one cinematic reveal
+  - Fast Mode for quicker opening
+- One-by-one reveal locks opening controls until the current reveal is complete.
+- Mythic reveal sparkle effect.
+- Optional audio controls:
+  - Global mute
+  - Music toggle
+  - SFX toggle
+  - Volume slider
+- Chase tracker with hit banner/history marker.
+- Clickable card preview modal.
+- Session stats:
   - Packs opened
   - Total estimated value
   - Average pack value
   - Best card pulled
   - Best pack value
   - Mythics pulled
-  - Net profit/loss using the selected pack type MSRP
+  - Net profit/loss using selected booster MSRP
+- Binder page with:
+  - Best pulls
+  - Full pulled-card binder
+  - Search/filter/sort controls
+  - Duplicate tracking
+- Pack history page with filtering, sorting, chase hit details, and card lists.
+- Local persistence for selected set, booster choices, reveal mode, session stats, binder, pack history, audio preferences, fast mode, and chase tracker.
+- Reset controls for local session state.
+
+## Pack Battle Mode
+
+Pack Battle is a dedicated head-to-head mode.
+
+Current Pack Battle features:
+
+- Two-player name entry.
+- Reveal-all battle flow.
+- One-by-one battle flow with paired reveals.
+- Running total for each side during one-by-one reveal.
+- Newest card appears on top of the previous card stack.
+- Winner/draw state after the battle completes.
+- Battle session stats:
+  - Wins per player
+  - Win percentage
+  - Best pack
+  - Biggest win margin
+- Reset battle stats button.
+- Battle history with:
+  - Winner or draw
+  - Margin
+  - Player names
+  - Set
+  - Booster type
+  - Both pack totals
+  - Best pull from each side
+- Battle stats/history persist in local storage and survive refresh.
 
 ## Tech Stack
 
@@ -64,15 +102,16 @@ v1.1.0 - Themed pack selection flow and pack type UI
 - Spring Web
 - Jackson
 - Scryfall API
-- No database yet
-- No external cache library yet
+- Docker for deployment
 
 ### Frontend
 
-- React
+- React 18
 - TypeScript
 - Vite
 - TailwindCSS
+- Vitest
+- Sharp for pack-wrapper image optimization
 
 ## Requirements
 
@@ -145,28 +184,21 @@ npm run dev
 
 ### Local URLs
 
-The backend runs on:
+Backend:
 
 ```text
 http://localhost:8080
 ```
 
-If port `8080` is already in use:
-
-```powershell
-netstat -ano | findstr :8080
-Stop-Process -Id <PID>
-```
-
-The frontend runs on:
+Frontend:
 
 ```text
 http://localhost:5173
 ```
 
-Vite proxies `/api` requests to the backend.
+Vite proxies `/api` requests to the backend during local development.
 
-For deployed frontend builds, set `VITE_API_BASE_URL` to the backend URL. Local development can leave it blank because the Vite proxy handles `/api` requests.
+For deployed frontend builds, set `VITE_API_BASE_URL` to the backend URL. Local development can leave it blank.
 
 Example:
 
@@ -183,6 +215,13 @@ cd "C:\Users\your_name\Documents\MTG-Pack-Simulator\backend"
 $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21.x.x.x-hotspot'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
 .\mvnw.cmd -DskipTests compile
+```
+
+### Windows Backend Tests
+
+```powershell
+cd "C:\Users\your_name\Documents\MTG-Pack-Simulator\backend"
+.\mvnw.cmd test
 ```
 
 ### Windows Frontend Build
@@ -207,7 +246,12 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 21)
 ./mvnw -DskipTests compile
 ```
 
-On Linux, set `JAVA_HOME` to your local JDK 21 install path if needed.
+### macOS / Linux Backend Tests
+
+```bash
+cd ~/Documents/MTG-Pack-Simulator/backend
+./mvnw test
+```
 
 ### macOS / Linux Frontend Build
 
@@ -223,23 +267,15 @@ cd ~/Documents/MTG-Pack-Simulator/frontend
 npm run test
 ```
 
-### Backend Tests
-
-Use the same Maven Wrapper command style for your platform:
-
-```powershell
-.\mvnw.cmd test
-```
-
-```bash
-./mvnw test
-```
-
 ## API Endpoints
+
+### `GET /api/health`
+
+Returns a simple backend health response.
 
 ### `GET /api/sets`
 
-Returns the currently supported pack definitions.
+Returns the currently supported set metadata.
 
 Example response:
 
@@ -258,7 +294,7 @@ Example response:
 
 Opens a pack for the selected set code. The optional `boosterType` query parameter accepts `play` or `collector` and defaults to `play`.
 
-Example:
+Examples:
 
 ```text
 GET /api/packs/blb/open
@@ -276,27 +312,49 @@ Example response:
       "name": "Card Name",
       "rarity": "rare",
       "imageUrl": "https://...",
-      "priceUsd": 1.23
+      "priceUsd": 1.23,
+      "priceAvailable": true,
+      "finish": null,
+      "treatment": null,
+      "slot": "rare-or-mythic"
     }
   ],
   "totalValueUsd": 8.45
 }
 ```
 
+### `GET /api/packs/{setCode}/warmup`
+
+Starts cache warmup for a set and booster type.
+
+Example:
+
+```text
+GET /api/packs/blb/warmup?boosterType=collector
+```
+
+### `GET /api/packs/{setCode}/warmup/status`
+
+Returns warmup status for a set and booster type.
+
+Example:
+
+```text
+GET /api/packs/blb/warmup/status?boosterType=collector
+```
+
 ## Backend Design Notes
 
-- `PackController` exposes pack-opening endpoints.
+- `PackController` exposes pack-opening and warmup endpoints.
 - `PackOpeningService` owns pack generation and cache-backed card drawing.
-- `PackDefinitionService` owns the currently supported in-memory pack definitions.
-- `PackDefinition` describes a supported set, pack type, MSRP, and slots.
-- `PackSlot` describes pack slots like commons, uncommons, rare/mythic, and land.
-- `ScryfallClient` handles Scryfall HTTP calls and maps Scryfall responses into app-level `CardDto` objects.
+- `PackDefinitionService` owns in-memory pack definitions.
+- `PackDefinition` describes supported set, booster type, MSRP, and slots.
+- `PackSlot` describes slots like commons, uncommons, rare/mythic, land, collector rare/mythic, and special treatment fallback slots.
+- `ScryfallClient` handles Scryfall HTTP calls and maps responses into app-level `CardDto` objects.
 - Raw Scryfall JSON is not returned to the frontend.
-- Frontend-only theme metadata and CSS pack wrapper visuals live separately from backend pack definitions.
+- The backend currently uses in-memory data and cache state only.
 
 ## Current Supported Sets
-
-The app is structured for multiple sets. Current definitions include:
 
 - `blb` - Bloomburrow
 - `dsk` - Duskmourn: House of Horror
@@ -308,45 +366,36 @@ The app is structured for multiple sets. Current definitions include:
 - `otj` - Outlaws of Thunder Junction
 - `woe` - Wilds of Eldraine
 
-All currently use the same temporary barebones play-booster composition.
+Each supported set currently has play and collector definitions plus matching play and collector wrapper art.
 
-## Known Limitations
+## Current Pack Modeling
 
-- Pack collation is simplified and not yet fully accurate to real MTG booster rules.
-- Foils are not implemented yet.
-- Showcase, borderless, and alternate-art handling are not implemented yet.
-- Collector booster collation is simplified and not yet fully accurate to real collector booster rules.
-- Collector booster MSRP is currently frontend metadata.
-- Session stats are frontend state only and reset on refresh.
-- No database yet.
-- No user accounts yet.
-- Deployment config targets Vercel for the frontend and Render for the backend.
+Play boosters use a simplified structure:
+
+- 10 commons
+- 3 uncommons
+- 1 rare or mythic
+- 1 land
+
+Collector boosters use a simplified rare-heavy structure with broad slots for:
+
+- foil commons
+- foil uncommons
+- foil rare/mythic
+- extended-art rare/mythic
+- showcase/borderless rare/mythic
+- foil land
+
+Collector boosters are playable in the app, but they are not yet exact set-specific collector booster simulations.
 
 ## Deployment Notes
 
-The frontend and backend can be deployed separately.
+The app is deployed as separate frontend and backend services.
 
-- Frontend target: Vercel.
-- Backend target: Render.
-- Set the Vercel root directory to `frontend`.
-- Set `VITE_API_BASE_URL` in Vercel to the deployed Render backend origin.
-- Render uses `render.yaml` and `backend/Dockerfile` to build the Spring Boot API on Java 21.
-- Set `APP_CORS_ALLOWED_ORIGINS` in Render to the deployed Vercel frontend origin.
-- Keep local origins for local development only:
-  - `http://localhost:5173`
-  - `http://127.0.0.1:5173`
-
-Example backend property:
-
-```properties
-app.cors.allowed-origins=https://your-frontend.example.com
-```
-
-If a host exposes environment variables instead of property files, Spring Boot can read the same value from:
-
-```text
-APP_CORS_ALLOWED_ORIGINS=https://your-frontend.example.com
-```
+- Frontend: Vercel
+- Backend: Render
+- Frontend production URL: `https://packbloom.vercel.app`
+- Backend production URL: `https://mtg-pack-simulator-api.onrender.com`
 
 ### Vercel Frontend
 
@@ -362,7 +411,7 @@ Output Directory: dist
 Environment variable:
 
 ```text
-VITE_API_BASE_URL=https://your-render-backend.onrender.com
+VITE_API_BASE_URL=https://mtg-pack-simulator-api.onrender.com
 ```
 
 ### Render Backend
@@ -380,20 +429,20 @@ Plan: Free for portfolio/demo use
 Environment variable:
 
 ```text
-APP_CORS_ALLOWED_ORIGINS=https://your-vercel-frontend.vercel.app
+APP_CORS_ALLOWED_ORIGINS=https://packbloom.vercel.app
 ```
 
-Render's free web services can cold start after inactivity. That is acceptable for a portfolio/demo app, but upgrade the plan if you want consistently fast first requests.
+Render free web services can cold start after inactivity. PackBloom shows user-facing engine wake/warmup messaging for this.
 
-### Asset Optimization
+## Pack Wrapper Assets
 
-Original PNG pack wrapper uploads live in:
+Original uploaded PNG wrapper art lives in:
 
 ```text
 frontend/src/assets/pack-wrappers/
 ```
 
-The app imports optimized WebP versions from:
+Optimized WebP versions live in:
 
 ```text
 frontend/src/assets/pack-wrappers/optimized/
@@ -411,46 +460,58 @@ cd ~/Documents/MTG-Pack-Simulator/frontend
 npm run optimize:wrappers
 ```
 
-## Disclaimer
+## Known Limitations
 
-This is an unofficial fan project. Magic: The Gathering, set names, card names, card images, pack wrapper art, and related trademarks belong to Wizards of the Coast. Card data and card images are provided through the Scryfall API where applicable. This project is not affiliated with, endorsed by, sponsored by, or approved by Wizards of the Coast or Scryfall.
+- Pack collation is simplified and not yet fully accurate to official MTG booster rules.
+- Collector booster collation is generic and not yet set-specific.
+- Foil behavior is represented only loosely in collector slot labels; true foil treatment modeling is not complete.
+- Showcase, borderless, extended-art, and special treatment slots are broad approximations.
+- Collector booster MSRP is currently static metadata.
+- Pricing depends on Scryfall availability and can be missing for some prints.
+- Local persistence uses browser `localStorage`; there is no database yet.
+- No user accounts yet.
+- Render free-tier cold starts can make first backend requests slower.
 
 ## Roadmap / Backlog
 
-### Documentation And Code Quality
-
-- Add more detailed inline comments where helpful.
-- Add focused tests for backend pack-generation behavior.
-- Add frontend component tests later.
-
 ### Pack And Set Accuracy
 
-- Improve collector booster generation accuracy.
-- Add more accurate play-booster collation.
-- Add foils.
-- Add showcase, borderless, and alternate-art support.
-- Add set-specific collector booster MSRP and metadata from the backend.
+- Add set-specific collector booster definitions.
+- Improve play-booster collation.
+- Improve foil/treatment modeling.
+- Add special guest/list-style slots where relevant.
+- Improve collector booster MSRP/market price metadata.
 - Add more sets.
 
-### User Experience
+### Collection Features
 
-- Add fast mode / skip animation controls.
-- Add rarity suspense reveal before card flips.
-- Add mythic pull effects such as particles or confetti.
-- Improve binder sorting/filtering and pull history details.
-- Add session reset controls.
-- Persist selected set, selected pack type, session stats, and binder data in `localStorage`.
-- Improve responsive polish and broader CSS styling.
+- Set checklist and collection completion percentage.
+- Better all-time best pulls gallery.
+- Favorite/star cards.
+- More binder filters and saved views.
+
+### Game Modes
+
+- Continue polishing Pack Battle history and presentation.
+- Add sealed pool builder later.
 
 ### Persistence And Infrastructure
 
+- Design initial database schema.
 - Add PostgreSQL later.
 - Add Spring Data JPA later.
 - Add Flyway migrations later.
-- Add Caffeine caching later.
-- Add deployment setup:
-  - Frontend on Vercel
-  - Backend on Render, Railway, or Fly.io
+- Add user accounts later.
+
+### Testing And Code Quality
+
+- Add more backend pack-generation tests.
+- Add frontend component tests for battle, binder, history, and reveal flows.
+- Add more comments around complex pack-generation logic.
+
+## Disclaimer
+
+This is an unofficial fan project. Magic: The Gathering, set names, card names, card images, pack wrapper art, and related trademarks belong to Wizards of the Coast. Card data and card images are provided through the Scryfall API where applicable. This project is not affiliated with, endorsed by, sponsored by, or approved by Wizards of the Coast or Scryfall.
 
 ## Git Notes
 
