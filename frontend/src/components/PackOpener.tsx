@@ -75,6 +75,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   const [engineWaitSeconds, setEngineWaitSeconds] = useState(0);
   const [openingWaitSeconds, setOpeningWaitSeconds] = useState(0);
   const [warmupStatus, setWarmupStatus] = useState<WarmupStatusDto | null>(null);
+  const [warmupRetryKey, setWarmupRetryKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [sessionStats, setSessionStats] = useState<SessionStats>(persistedSession?.sessionStats ?? initialSessionStats);
   const [revealMode, setRevealMode] = useState<RevealMode>(persistedSession?.revealMode ?? 'all');
@@ -277,7 +278,7 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     return () => {
       ignore = true;
     };
-  }, [engineStatus, selectedBoosterType, selectedSetCode, sets.length]);
+  }, [engineStatus, selectedBoosterType, selectedSetCode, sets.length, warmupRetryKey]);
 
   useEffect(() => {
     if (!warmupStatus || warmupStatus.status !== 'loading') {
@@ -643,9 +644,11 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
           onChangeSet={() => setAppStep('select-set')}
           onHome={() => setAppStep('start')}
           onRetryEngine={() => setEngineRetryKey((currentKey) => currentKey + 1)}
+          onRetryWarmup={() => setWarmupRetryKey((currentKey) => currentKey + 1)}
           onSelectCard={setSelectedCard}
           selectedSet={selectedSet}
           theme={selectedTheme}
+          warmupStatus={warmupStatus}
         />
         {audioControls}
         {selectedCard && <CardPreviewModal card={selectedCard} onClose={() => setSelectedCard(null)} />}

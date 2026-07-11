@@ -34,6 +34,7 @@ frontend/  React + TypeScript + Vite UI
 - Real optimized WebP pack wrapper assets for each supported set and booster type.
 - Live Scryfall integration for card data, images, rarities, and prices.
 - Backend card-pool caching and warmup endpoints to reduce slow first opens.
+- Pack opening retries transient Scryfall/rate-limit failures with short backoff.
 - Pack reveal modes:
   - Reveal all
   - One-by-one cinematic reveal
@@ -63,7 +64,9 @@ frontend/  React + TypeScript + Vite UI
 - Pack history page with filtering, sorting, chase hit details, and card lists.
 - Local persistence for selected set, booster choices, reveal mode, session stats, binder, pack history, audio preferences, fast mode, and chase tracker.
 - Database-backed saved session autosync for the main pack-opening session.
+- Database-backed Pack Battle stats/history autosync.
 - Reset controls for local session state.
+- GitHub Actions CI for backend tests, frontend build, and frontend tests.
 
 ## Pack Battle Mode
 
@@ -91,7 +94,9 @@ Current Pack Battle features:
   - Booster type
   - Both pack totals
   - Best pull from each side
-- Battle stats/history persist in local storage and survive refresh.
+- Battle stats/history persist locally and autosync to the database.
+- Pack Battle waits for card-pool warmup before enabling battle start.
+- Pack Battle shows warmup progress and retry controls when Scryfall preload has a temporary issue.
 
 ## Tech Stack
 
@@ -374,6 +379,22 @@ Updates a saved session snapshot.
 
 Deletes a saved session snapshot.
 
+### `POST /api/battle-sessions`
+
+Creates a saved Pack Battle snapshot.
+
+### `GET /api/battle-sessions/{id}`
+
+Fetches a saved Pack Battle snapshot.
+
+### `PUT /api/battle-sessions/{id}`
+
+Updates a saved Pack Battle snapshot.
+
+### `DELETE /api/battle-sessions/{id}`
+
+Deletes a saved Pack Battle snapshot.
+
 ## Backend Design Notes
 
 - `PackController` exposes pack-opening and warmup endpoints.
@@ -383,7 +404,8 @@ Deletes a saved session snapshot.
 - `PackSlot` describes slots like commons, uncommons, rare/mythic, land, collector rare/mythic, and special treatment fallback slots.
 - `ScryfallClient` handles Scryfall HTTP calls and maps responses into app-level `CardDto` objects.
 - `SavedSessionController` and `SavedSessionService` store browser-linked session snapshots in the database.
-- Flyway owns schema creation, starting with the `saved_sessions` table.
+- `SavedBattleSessionController` and `SavedBattleSessionService` store browser-linked Pack Battle snapshots in the database.
+- Flyway owns schema creation, starting with the `saved_sessions` and `saved_battle_sessions` tables.
 - Raw Scryfall JSON is not returned to the frontend.
 - Pack definitions and card-pool cache state are still in memory.
 
@@ -504,10 +526,11 @@ npm run optimize:wrappers
 - Showcase, borderless, extended-art, and special treatment slots are broad approximations.
 - Collector booster MSRP is currently static metadata.
 - Pricing depends on Scryfall availability and can be missing for some prints.
-- Main pack-opening session state autosyncs to the database, but battle state is still browser-local.
+- Main pack-opening and Pack Battle state autosync to the database.
 - Saved sessions are browser-linked; there are no user accounts or cross-device sign-in yet.
 - No user accounts yet.
 - Render free-tier cold starts can make first backend requests slower.
+- Cold collector battles can still take longer because PackBattle preloads multiple Scryfall card pools before enabling start.
 
 ## Roadmap / Backlog
 
@@ -535,11 +558,17 @@ npm run optimize:wrappers
 ### Persistence And Infrastructure
 
 - Expand the database schema beyond saved session snapshots.
-- Move battle history/stats into database persistence.
+- Normalize saved session and Pack Battle snapshots into relational tables over time.
 - Add user accounts later.
+
+### Performance And Reliability
+
+- Continue improving Scryfall retry/backoff and cache behavior.
+- Add more production smoke tests for deployed database and Pack Battle flows.
 
 ### Testing And Code Quality
 
+- Keep GitHub Actions CI green for backend and frontend checks.
 - Add more backend pack-generation tests.
 - Add frontend component tests for battle, binder, history, and reveal flows.
 - Add more comments around complex pack-generation logic.

@@ -1,6 +1,7 @@
 package com.mtgpacksim.config;
 
 import com.mtgpacksim.pack.PackOpeningException;
+import com.mtgpacksim.battle.SavedBattleSessionException;
 import com.mtgpacksim.scryfall.ScryfallException;
 import com.mtgpacksim.session.SavedSessionException;
 import org.slf4j.Logger;
@@ -59,6 +60,20 @@ public class ApiExceptionHandler {
                 .status(status)
                 .body(new ApiErrorResponse(
                         status == HttpStatus.NOT_FOUND ? "SAVED_SESSION_NOT_FOUND" : "SAVED_SESSION_INVALID",
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(SavedBattleSessionException.class)
+    ResponseEntity<ApiErrorResponse> handleSavedBattleSessionError(SavedBattleSessionException exception) {
+        HttpStatus status = "Saved battle session not found.".equals(exception.getMessage())
+                ? HttpStatus.NOT_FOUND
+                : HttpStatus.BAD_REQUEST;
+
+        return ResponseEntity
+                .status(status)
+                .body(new ApiErrorResponse(
+                        status == HttpStatus.NOT_FOUND ? "SAVED_BATTLE_SESSION_NOT_FOUND" : "SAVED_BATTLE_SESSION_INVALID",
                         exception.getMessage()
                 ));
     }

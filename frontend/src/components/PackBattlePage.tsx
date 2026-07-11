@@ -1,5 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createSavedBattleSession,
+  deleteSavedBattleSession,
+  updateSavedBattleSession,
+} from '../api/battleSessionApi';
 import { openPack } from '../api/packApi';
+import type { WarmupStatusDto } from '../api/packApi';
 import { playFeedbackSound } from '../audioFeedback';
 import { formatCardPrice } from '../cardPrice';
 import { getBoosterOption, type BoosterType } from '../packLabels';
@@ -17,9 +23,11 @@ type PackBattlePageProps = {
   onChangeSet: () => void;
   onHome: () => void;
   onRetryEngine: () => void;
+  onRetryWarmup: () => void;
   onSelectCard: (card: CardDto) => void;
   selectedSet: SupportedSetDto | undefined;
   theme: SetTheme;
+  warmupStatus: WarmupStatusDto | null;
 };
 
 type BattleSide = 'A' | 'B';
@@ -67,6 +75,7 @@ const initialBattleStats: BattleSessionStats = {
   ties: 0,
 };
 const BATTLE_SESSION_STORAGE_KEY = 'packbloom-battle-session-v1';
+const REMOTE_BATTLE_SESSION_ID_KEY = 'packbloom-remote-battle-session-id-v1';
 const BATTLE_HISTORY_LIMIT = 30;
 
 export function PackBattlePage({
@@ -79,10 +88,14 @@ export function PackBattlePage({
   onChangeSet,
   onHome,
   onRetryEngine,
+  onRetryWarmup,
   onSelectCard,
   selectedSet,
   theme,
+  warmupStatus,
 }: PackBattlePageProps) {
+  const remoteBattleSessionIdRef = useRef<string | null>(loadRemoteBattleSessionId());
+  const isCreatingRemoteBattleSessionRef = useRef(false);
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -99,6 +112,10 @@ export function PackBattlePage({
   const [battleHistory, setBattleHistory] = useState<BattleHistoryEntry[]>(
     persistedBattleSession?.battleHistory ?? [],
   );
+  const persistedBattleSessionPayload = useMemo(() => ({
+    battleHistory,
+    battleStats,
+  }), [battleHistory, battleStats]);
 
   const winner = useMemo(() => {
     if (!battleResult) {
@@ -118,13 +135,49 @@ export function PackBattlePage({
   const isOneByOneBattleActive = Boolean(
     battleResult && battleRevealMode === 'one-by-one' && !hasRevealedEveryCard,
   );
+  const isCurrentWarmup = warmupStatus?.setCode === selectedSet?.setCode && warmupStatus?.boosterType === boosterType;
+  const currentWarmupStatus = isCurrentWarmup ? warmupStatus : null;
+  const isWarmupReady = currentWarmupStatus?.status === 'ready';
+  const isWarmupLoading = Boolean(
+    !currentWarmupStatus || currentWarmupStatus.status === 'idle' || currentWarmupStatus.status === 'loading',
+  );
+  const canStartBattle = isEngineReady && isWarmupReady && !isLoading && !isOneByOneBattleActive;
 
   useEffect(() => {
-    savePersistedBattleSession({ battleHistory, battleStats });
-  }, [battleHistory, battleStats]);
+    savePersistedBattleSession(persistedBattleSessionPayload);
+  }, [persistedBattleSessionPayload]);
+
+  useEffect(() => {
+    if (!isEngineReady) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const remoteBattleSessionId = remoteBattleSessionIdRef.current;
+
+      if (remoteBattleSessionId) {
+        updateSavedBattleSession(remoteBattleSessionId, persistedBattleSessionPayload).catch(() => undefined);
+        return;
+      }
+
+      if (isCreatingRemoteBattleSessionRef.current) {
+        return;
+      }
+
+      isCreatingRemoteBattleSessionRef.current = true;
+      createSavedBattleSession(persistedBattleSessionPayload).then((savedSession) => {
+        remoteBattleSessionIdRef.current = savedSession.id;
+        saveRemoteBattleSessionId(savedSession.id);
+      }).catch(() => undefined).finally(() => {
+        isCreatingRemoteBattleSessionRef.current = false;
+      });
+    }, 1500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isEngineReady, persistedBattleSessionPayload]);
 
   async function handleStartBattle() {
-    if (!isEngineReady || !selectedSet || isOneByOneBattleActive) {
+    if (!canStartBattle || !selectedSet) {
       return;
     }
 
@@ -274,7 +327,7 @@ export function PackBattlePage({
               </label>
               <button
                 className="rounded-md bg-ember px-5 py-3 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-                disabled={!isEngineReady || isLoading || isOneByOneBattleActive}
+                disabled={!canStartBattle}
                 onClick={handleStartBattle}
                 type="button"
               >
@@ -282,8 +335,10 @@ export function PackBattlePage({
                   ? 'Battling...'
                   : isOneByOneBattleActive
                     ? 'Finish Reveal First'
-                    : isEngineReady
+                    : isEngineReady && isWarmupReady
                       ? 'Start Battle'
+                      : isEngineReady
+                        ? 'Preloading...'
                       : 'Engine Waking'}
               </button>
             </div>
@@ -331,6 +386,35 @@ export function PackBattlePage({
                   : `Opening ${normalizePlayerName(playerAName, 'Player 1')}'s pack...`}
               </p>
             )}
+            {isEngineReady && !isWarmupReady && (
+              <div className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-stone-300">
+                <p>{getBattleWarmupStatusMessage(currentWarmupStatus)}</p>
+                {currentWarmupStatus && currentWarmupStatus.totalPools > 0 && (
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-ember transition-all"
+                      style={{
+                        width: `${Math.min(100, Math.round((currentWarmupStatus.loadedPools / currentWarmupStatus.totalPools) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                )}
+                {currentWarmupStatus?.status === 'error' && (
+                  <button
+                    className="mt-3 text-xs font-bold uppercase tracking-[0.16em] text-ember underline-offset-4 hover:underline"
+                    onClick={onRetryWarmup}
+                    type="button"
+                  >
+                    Retry preload
+                  </button>
+                )}
+                {isWarmupLoading && (
+                  <p className="mt-2 text-xs font-semibold text-stone-500">
+                    Battle starts after the shared card pools are cached, so both packs avoid cold Scryfall requests.
+                  </p>
+                )}
+              </div>
+            )}
             {!isEngineReady && (
               <div className="text-sm font-semibold text-stone-300">
                 <p>{engineStatusMessage}</p>
@@ -359,9 +443,16 @@ export function PackBattlePage({
           playerBName={normalizePlayerName(playerBName, 'Player 2')}
           stats={battleStats}
           onResetStats={() => {
+            const remoteBattleSessionId = remoteBattleSessionIdRef.current;
+            if (remoteBattleSessionId) {
+              deleteSavedBattleSession(remoteBattleSessionId).catch(() => undefined);
+            }
+            remoteBattleSessionIdRef.current = null;
+            isCreatingRemoteBattleSessionRef.current = false;
             setBattleStats(initialBattleStats);
             setBattleHistory([]);
             clearPersistedBattleSession();
+            clearRemoteBattleSessionId();
           }}
         />
 
@@ -453,6 +544,22 @@ function BattleWinnerBanner({
       </div>
     </div>
   );
+}
+
+function getBattleWarmupStatusMessage(warmupStatus: WarmupStatusDto | null): string {
+  if (!warmupStatus || warmupStatus.totalPools <= 0) {
+    return 'Preparing battle card pools before opening both packs.';
+  }
+
+  if (warmupStatus.status === 'idle') {
+    return 'Battle card pools are queued for preload.';
+  }
+
+  if (warmupStatus.status === 'error') {
+    return 'Card pool preload hit a temporary Scryfall issue. Retry preload before starting the battle.';
+  }
+
+  return `Preloading battle card pools ${warmupStatus.loadedPools}/${warmupStatus.totalPools}.`;
 }
 
 function BattlePackPanel({
@@ -836,6 +943,30 @@ function clearPersistedBattleSession() {
   }
 
   window.localStorage.removeItem(BATTLE_SESSION_STORAGE_KEY);
+}
+
+function loadRemoteBattleSessionId(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.localStorage.getItem(REMOTE_BATTLE_SESSION_ID_KEY);
+}
+
+function saveRemoteBattleSessionId(id: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(REMOTE_BATTLE_SESSION_ID_KEY, id);
+}
+
+function clearRemoteBattleSessionId() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(REMOTE_BATTLE_SESSION_ID_KEY);
 }
 
 function isBattleSessionStats(stats: unknown): stats is BattleSessionStats {
