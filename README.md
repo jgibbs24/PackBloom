@@ -219,6 +219,8 @@ SPRING_DATASOURCE_USERNAME=your_username
 SPRING_DATASOURCE_PASSWORD=your_password
 ```
 
+On Render, the Docker start command also accepts Render's native `DATABASE_URL` value and converts it to the JDBC format Spring Boot expects.
+
 ## Build And Verification
 
 ### Windows Backend Compile
@@ -461,10 +463,10 @@ Environment variable:
 
 ```text
 APP_CORS_ALLOWED_ORIGINS=https://packbloom.vercel.app
-SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/database
-SPRING_DATASOURCE_USERNAME=your_username
-SPRING_DATASOURCE_PASSWORD=your_password
+DATABASE_URL=postgresql://user:password@host:5432/database
 ```
+
+If configuring the backend manually instead of through the blueprint, create a Render Postgres instance and copy its internal database URL into `DATABASE_URL`. The app's Docker startup command converts that value to `SPRING_DATASOURCE_URL` before Spring Boot starts. If you prefer setting Spring's variable directly, use the JDBC form: `jdbc:postgresql://host:5432/database`.
 
 Render free web services can cold start after inactivity. PackBloom shows user-facing engine wake/warmup messaging for this.
 
