@@ -62,6 +62,7 @@ frontend/  React + TypeScript + Vite UI
   - Duplicate tracking
 - Pack history page with filtering, sorting, chase hit details, and card lists.
 - Local persistence for selected set, booster choices, reveal mode, session stats, binder, pack history, audio preferences, fast mode, and chase tracker.
+- Database-backed saved session autosync for the main pack-opening session.
 - Reset controls for local session state.
 
 ## Pack Battle Mode
@@ -100,6 +101,10 @@ Current Pack Battle features:
 - Spring Boot
 - Maven + Maven Wrapper
 - Spring Web
+- Spring Data JPA
+- Flyway migrations
+- PostgreSQL for production persistence
+- H2 for local fallback persistence
 - Jackson
 - Scryfall API
 - Docker for deployment
@@ -204,6 +209,14 @@ Example:
 
 ```bash
 VITE_API_BASE_URL=https://your-backend.example.com
+```
+
+The backend uses an in-memory H2 database by default so local development works without installing PostgreSQL. To use PostgreSQL, provide:
+
+```text
+SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/database
+SPRING_DATASOURCE_USERNAME=your_username
+SPRING_DATASOURCE_PASSWORD=your_password
 ```
 
 ## Build And Verification
@@ -343,6 +356,22 @@ Example:
 GET /api/packs/blb/warmup/status?boosterType=collector
 ```
 
+### `POST /api/sessions`
+
+Creates a saved session snapshot.
+
+### `GET /api/sessions/{id}`
+
+Fetches a saved session snapshot.
+
+### `PUT /api/sessions/{id}`
+
+Updates a saved session snapshot.
+
+### `DELETE /api/sessions/{id}`
+
+Deletes a saved session snapshot.
+
 ## Backend Design Notes
 
 - `PackController` exposes pack-opening and warmup endpoints.
@@ -351,8 +380,10 @@ GET /api/packs/blb/warmup/status?boosterType=collector
 - `PackDefinition` describes supported set, booster type, MSRP, and slots.
 - `PackSlot` describes slots like commons, uncommons, rare/mythic, land, collector rare/mythic, and special treatment fallback slots.
 - `ScryfallClient` handles Scryfall HTTP calls and maps responses into app-level `CardDto` objects.
+- `SavedSessionController` and `SavedSessionService` store browser-linked session snapshots in the database.
+- Flyway owns schema creation, starting with the `saved_sessions` table.
 - Raw Scryfall JSON is not returned to the frontend.
-- The backend currently uses in-memory data and cache state only.
+- Pack definitions and card-pool cache state are still in memory.
 
 ## Current Supported Sets
 
@@ -430,6 +461,9 @@ Environment variable:
 
 ```text
 APP_CORS_ALLOWED_ORIGINS=https://packbloom.vercel.app
+SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/database
+SPRING_DATASOURCE_USERNAME=your_username
+SPRING_DATASOURCE_PASSWORD=your_password
 ```
 
 Render free web services can cold start after inactivity. PackBloom shows user-facing engine wake/warmup messaging for this.
@@ -468,7 +502,8 @@ npm run optimize:wrappers
 - Showcase, borderless, extended-art, and special treatment slots are broad approximations.
 - Collector booster MSRP is currently static metadata.
 - Pricing depends on Scryfall availability and can be missing for some prints.
-- Local persistence uses browser `localStorage`; there is no database yet.
+- Main pack-opening session state autosyncs to the database, but battle state is still browser-local.
+- Saved sessions are browser-linked; there are no user accounts or cross-device sign-in yet.
 - No user accounts yet.
 - Render free-tier cold starts can make first backend requests slower.
 
@@ -497,10 +532,8 @@ npm run optimize:wrappers
 
 ### Persistence And Infrastructure
 
-- Design initial database schema.
-- Add PostgreSQL later.
-- Add Spring Data JPA later.
-- Add Flyway migrations later.
+- Expand the database schema beyond saved session snapshots.
+- Move battle history/stats into database persistence.
 - Add user accounts later.
 
 ### Testing And Code Quality

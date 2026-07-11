@@ -2,6 +2,7 @@ package com.mtgpacksim.config;
 
 import com.mtgpacksim.pack.PackOpeningException;
 import com.mtgpacksim.scryfall.ScryfallException;
+import com.mtgpacksim.session.SavedSessionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -45,6 +46,20 @@ public class ApiExceptionHandler {
                 .body(new ApiErrorResponse(
                         "PACK_OPENING_TIMEOUT",
                         "Opening this pack took too long while loading Scryfall data. Please try again."
+                ));
+    }
+
+    @ExceptionHandler(SavedSessionException.class)
+    ResponseEntity<ApiErrorResponse> handleSavedSessionError(SavedSessionException exception) {
+        HttpStatus status = "Saved session not found.".equals(exception.getMessage())
+                ? HttpStatus.NOT_FOUND
+                : HttpStatus.BAD_REQUEST;
+
+        return ResponseEntity
+                .status(status)
+                .body(new ApiErrorResponse(
+                        status == HttpStatus.NOT_FOUND ? "SAVED_SESSION_NOT_FOUND" : "SAVED_SESSION_INVALID",
+                        exception.getMessage()
                 ));
     }
 

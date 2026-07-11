@@ -22,6 +22,7 @@ export type PersistedSessionState = {
 };
 
 const SESSION_STORAGE_KEY = 'packbloom-session-v1';
+const REMOTE_SESSION_ID_KEY = 'packbloom-remote-session-id-v1';
 const SESSION_STORAGE_VERSION = 1;
 
 type StoredSessionState = PersistedSessionState & {
@@ -82,6 +83,19 @@ export function savePersistedSession(session: PersistedSessionState) {
 
 export function clearPersistedSession() {
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  clearRemoteSessionId();
+}
+
+export function loadRemoteSessionId(): string | null {
+  return window.localStorage.getItem(REMOTE_SESSION_ID_KEY);
+}
+
+export function saveRemoteSessionId(id: string) {
+  window.localStorage.setItem(REMOTE_SESSION_ID_KEY, id);
+}
+
+export function clearRemoteSessionId() {
+  window.localStorage.removeItem(REMOTE_SESSION_ID_KEY);
 }
 
 function isPersistedActiveView(activeView: unknown): activeView is PersistedActiveView {
