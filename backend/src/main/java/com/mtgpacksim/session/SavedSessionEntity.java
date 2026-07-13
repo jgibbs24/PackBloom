@@ -22,6 +22,9 @@ public class SavedSessionEntity {
     @Column(name = "state_json", nullable = false, columnDefinition = "text")
     private String stateJson;
 
+    @Column(name = "user_id")
+    private UUID userId;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -67,6 +70,14 @@ public class SavedSessionEntity {
 
     public void setStateJson(String stateJson) {
         this.stateJson = stateJson;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public void setUserId(UUID userId) {
+        this.userId = userId;
     }
 
     public OffsetDateTime getCreatedAt() {

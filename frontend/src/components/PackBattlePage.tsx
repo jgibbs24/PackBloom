@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { AuthSession } from '../api/authApi';
 import {
   createSavedBattleSession,
   deleteSavedBattleSession,
+  fetchCurrentSavedBattleSession,
   updateSavedBattleSession,
 } from '../api/battleSessionApi';
 import { openPack } from '../api/packApi';
@@ -15,6 +17,7 @@ import type { SetTheme } from '../setThemes';
 
 type PackBattlePageProps = {
   audioVolume: number;
+  authSession: AuthSession | null;
   boosterType: BoosterType;
   canRetryEngine: boolean;
   canPlaySfx: boolean;
@@ -80,6 +83,7 @@ const BATTLE_HISTORY_LIMIT = 30;
 
 export function PackBattlePage({
   audioVolume,
+  authSession,
   boosterType,
   canRetryEngine,
   canPlaySfx,
@@ -146,6 +150,36 @@ export function PackBattlePage({
   useEffect(() => {
     savePersistedBattleSession(persistedBattleSessionPayload);
   }, [persistedBattleSessionPayload]);
+
+  useEffect(() => {
+    if (!authSession) {
+      return;
+    }
+
+    let ignore = false;
+
+    fetchCurrentSavedBattleSession().then((savedSession) => {
+      if (ignore || !savedSession) {
+        return;
+      }
+
+      remoteBattleSessionIdRef.current = savedSession.id;
+      saveRemoteBattleSessionId(savedSession.id);
+
+      if (isEmptyBattleSession(persistedBattleSessionPayload)) {
+        setBattleStats(isBattleSessionStats(savedSession.state.battleStats)
+          ? savedSession.state.battleStats
+          : initialBattleStats);
+        setBattleHistory(Array.isArray(savedSession.state.battleHistory)
+          ? (savedSession.state.battleHistory as BattleHistoryEntry[]).slice(0, BATTLE_HISTORY_LIMIT)
+          : []);
+      }
+    }).catch(() => undefined);
+
+    return () => {
+      ignore = true;
+    };
+  }, [authSession?.user.id]);
 
   useEffect(() => {
     if (!isEngineReady) {
@@ -990,4 +1024,11 @@ function findBestCard(cards: CardDto[]): CardDto | null {
     }
     return best;
   }, null);
+}
+
+function isEmptyBattleSession(session: {
+  battleHistory: unknown[];
+  battleStats: BattleSessionStats;
+}): boolean {
+  return session.battleHistory.length === 0 && session.battleStats.battles === 0;
 }

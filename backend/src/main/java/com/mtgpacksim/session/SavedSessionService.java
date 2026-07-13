@@ -3,6 +3,7 @@ package com.mtgpacksim.session;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mtgpacksim.auth.AuthenticatedUser;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -20,7 +21,7 @@ public class SavedSessionService {
         this.savedSessionRepository = savedSessionRepository;
     }
 
-    public SavedSessionResponse createSession(SavedSessionRequest request) {
+    public SavedSessionResponse createSession(SavedSessionRequest request, AuthenticatedUser user) {
         validateRequest(request);
 
         SavedSessionEntity entity = new SavedSessionEntity(
@@ -28,32 +29,58 @@ public class SavedSessionService {
                 normalizeDisplayName(request.displayName()),
                 serializeState(request.state())
         );
+        if (user != null) {
+            entity.setUserId(user.id());
+        }
 
         return toResponse(savedSessionRepository.save(entity));
     }
 
-    public SavedSessionResponse getSession(UUID id) {
-        return savedSessionRepository.findById(id)
+    public SavedSessionResponse getCurrentSession(AuthenticatedUser user) {
+        return savedSessionRepository.findFirstByUserIdOrderByUpdatedAtDesc(user.id())
                 .map(this::toResponse)
                 .orElseThrow(() -> new SavedSessionException("Saved session not found."));
     }
 
-    public SavedSessionResponse updateSession(UUID id, SavedSessionRequest request) {
+    public SavedSessionResponse getSession(UUID id, AuthenticatedUser user) {
+        return savedSessionRepository.findById(id)
+                .map((entity) -> requireAccess(entity, user))
+                .map(this::toResponse)
+                .orElseThrow(() -> new SavedSessionException("Saved session not found."));
+    }
+
+    public SavedSessionResponse updateSession(UUID id, SavedSessionRequest request, AuthenticatedUser user) {
         validateRequest(request);
 
         SavedSessionEntity entity = savedSessionRepository.findById(id)
                 .orElseThrow(() -> new SavedSessionException("Saved session not found."));
 
+        requireAccess(entity, user);
+        if (user != null && entity.getUserId() == null) {
+            entity.setUserId(user.id());
+        }
         entity.setDisplayName(normalizeDisplayName(request.displayName()));
         entity.setStateJson(serializeState(request.state()));
         return toResponse(savedSessionRepository.save(entity));
     }
 
-    public void deleteSession(UUID id) {
-        if (!savedSessionRepository.existsById(id)) {
-            throw new SavedSessionException("Saved session not found.");
+    public void deleteSession(UUID id, AuthenticatedUser user) {
+        SavedSessionEntity entity = savedSessionRepository.findById(id)
+                .orElseThrow(() -> new SavedSessionException("Saved session not found."));
+        requireAccess(entity, user);
+        savedSessionRepository.delete(entity);
+    }
+
+    private SavedSessionEntity requireAccess(SavedSessionEntity entity, AuthenticatedUser user) {
+        if (entity.getUserId() == null) {
+            return entity;
         }
-        savedSessionRepository.deleteById(id);
+
+        if (user != null && entity.getUserId().equals(user.id())) {
+            return entity;
+        }
+
+        throw new SavedSessionException("Saved session not found.");
     }
 
     private void validateRequest(SavedSessionRequest request) {

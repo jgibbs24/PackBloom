@@ -1,8 +1,9 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { AuthSession } from '../api/authApi';
 import { fetchApiHealth, fetchSupportedSets, fetchWarmupStatus, openPack, warmUpPack } from '../api/packApi';
 import type { WarmupStatusDto } from '../api/packApi';
-import { createSavedSession, updateSavedSession } from '../api/sessionApi';
+import { createSavedSession, fetchCurrentSavedSession, updateSavedSession } from '../api/sessionApi';
 import { playFeedbackSound, syncBackgroundMusic } from '../audioFeedback';
 import { formatCardPrice } from '../cardPrice';
 import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabels';
@@ -47,6 +48,7 @@ export type AppStep = 'start' | 'select-mode' | 'select-set' | 'open-pack' | 'pa
 
 type PackOpenerProps = {
   appStep: AppStep;
+  authSession: AuthSession | null;
   setAppStep: (appStep: AppStep) => void;
 };
 
@@ -61,7 +63,7 @@ const initialSessionStats: SessionStats = {
   mythicsPulled: 0,
 };
 
-export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
+export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps) {
   const persistedSession = useMemo(() => loadPersistedSession(), []);
   const remoteSessionIdRef = useRef<string | null>(loadRemoteSessionId());
   const isCreatingRemoteSessionRef = useRef(false);
@@ -155,6 +157,31 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   useEffect(() => {
     savePersistedSession(persistedSessionPayload);
   }, [persistedSessionPayload]);
+
+  useEffect(() => {
+    if (!authSession) {
+      return;
+    }
+
+    let ignore = false;
+
+    fetchCurrentSavedSession().then((savedSession) => {
+      if (ignore || !savedSession) {
+        return;
+      }
+
+      remoteSessionIdRef.current = savedSession.id;
+      saveRemoteSessionId(savedSession.id);
+
+      if (isEmptySession(persistedSessionPayload)) {
+        applyPersistedSessionState(savedSession.state);
+      }
+    }).catch(() => undefined);
+
+    return () => {
+      ignore = true;
+    };
+  }, [authSession?.user.id]);
 
   useEffect(() => {
     if (engineStatus !== 'ready') {
@@ -356,6 +383,24 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
     setSelectedSetCode(sets[0]?.setCode ?? DEFAULT_SET_CODE);
     setAppStep('start');
     setError(null);
+  }
+
+  function applyPersistedSessionState(session: PersistedSessionState) {
+    resetCurrentPack();
+    setActiveView(session.activeView);
+    setAllPulledCards(session.allPulledCards ?? []);
+    setAudioVolume(session.audioVolume);
+    setBinderCards(session.binderCards ?? []);
+    setBoosterTypesBySetCode(session.boosterTypesBySetCode ?? {});
+    setChaseCardName(session.chaseCardName ?? '');
+    setIsAudioMuted(session.isAudioMuted);
+    setIsFastMode(session.isFastMode);
+    setIsMusicEnabled(session.isMusicEnabled);
+    setIsSfxEnabled(session.isSfxEnabled);
+    setPackHistory(session.packHistory ?? []);
+    setRevealMode(session.revealMode);
+    setSelectedSetCode(session.selectedSetCode);
+    setSessionStats(session.sessionStats);
   }
 
   function handleSelectedSetChange(setCode: string) {
@@ -634,9 +679,10 @@ export function PackOpener({ appStep, setAppStep }: PackOpenerProps) {
   if (appStep === 'pack-battle') {
     return (
       <>
-        <PackBattlePage
-          audioVolume={audioVolume}
-          boosterType={selectedBoosterType}
+          <PackBattlePage
+            audioVolume={audioVolume}
+            authSession={authSession}
+            boosterType={selectedBoosterType}
           canRetryEngine={engineStatus === 'waking' || engineWaitSeconds >= 8}
           canPlaySfx={canPlaySfx}
           engineStatusMessage={getEngineStatusMessage(engineStatus, engineWaitSeconds)}
@@ -1218,4 +1264,10 @@ function updateBinderCards(currentCards: CardDto[], pack: OpenedPackDto): CardDt
   return Array.from(cardsById.values())
     .sort((left, right) => right.priceUsd - left.priceUsd)
     .slice(0, 20);
+}
+
+function isEmptySession(session: PersistedSessionState): boolean {
+  return session.sessionStats.packsOpened === 0
+    && session.allPulledCards.length === 0
+    && session.packHistory.length === 0;
 }

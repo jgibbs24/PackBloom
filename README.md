@@ -65,6 +65,8 @@ frontend/  React + TypeScript + Vite UI
 - Local persistence for selected set, booster choices, reveal mode, session stats, binder, pack history, audio preferences, fast mode, and chase tracker.
 - Database-backed saved session autosync for the main pack-opening session.
 - Database-backed Pack Battle stats/history autosync.
+- Optional user accounts with register/sign-in/sign-out.
+- Account-scoped cloud sync for opener sessions and Pack Battle snapshots.
 - Reset controls for local session state.
 - GitHub Actions CI for backend tests, frontend build, and frontend tests.
 
@@ -108,6 +110,7 @@ Current Pack Battle features:
 - Spring Web
 - Spring Data JPA
 - Flyway migrations
+- BCrypt password hashing via Spring Security Crypto
 - PostgreSQL for production persistence
 - H2 for local fallback persistence
 - Jackson
@@ -363,9 +366,29 @@ Example:
 GET /api/packs/blb/warmup/status?boosterType=collector
 ```
 
+### `POST /api/auth/register`
+
+Creates a PackBloom account and returns a bearer token.
+
+### `POST /api/auth/login`
+
+Signs into an existing account and returns a bearer token.
+
+### `GET /api/auth/me`
+
+Returns the signed-in user for the bearer token.
+
+### `POST /api/auth/logout`
+
+Deletes the current bearer token server-side.
+
 ### `POST /api/sessions`
 
-Creates a saved session snapshot.
+Creates a saved session snapshot. If a bearer token is provided, the snapshot is attached to that user account.
+
+### `GET /api/sessions/current`
+
+Returns the latest saved opener session for the signed-in user.
 
 ### `GET /api/sessions/{id}`
 
@@ -381,7 +404,11 @@ Deletes a saved session snapshot.
 
 ### `POST /api/battle-sessions`
 
-Creates a saved Pack Battle snapshot.
+Creates a saved Pack Battle snapshot. If a bearer token is provided, the snapshot is attached to that user account.
+
+### `GET /api/battle-sessions/current`
+
+Returns the latest saved Pack Battle snapshot for the signed-in user.
 
 ### `GET /api/battle-sessions/{id}`
 
@@ -405,7 +432,9 @@ Deletes a saved Pack Battle snapshot.
 - `ScryfallClient` handles Scryfall HTTP calls and maps responses into app-level `CardDto` objects.
 - `SavedSessionController` and `SavedSessionService` store browser-linked session snapshots in the database.
 - `SavedBattleSessionController` and `SavedBattleSessionService` store browser-linked Pack Battle snapshots in the database.
-- Flyway owns schema creation, starting with the `saved_sessions` and `saved_battle_sessions` tables.
+- `AuthController` and `AuthService` provide account registration, login, logout, and bearer-token lookup.
+- Passwords are stored as BCrypt hashes; raw auth tokens are returned once and stored server-side only as SHA-256 hashes.
+- Flyway owns schema creation, including saved snapshots, user accounts, auth tokens, and nullable user ownership columns.
 - Raw Scryfall JSON is not returned to the frontend.
 - Pack definitions and card-pool cache state are still in memory.
 
@@ -527,8 +556,8 @@ npm run optimize:wrappers
 - Collector booster MSRP is currently static metadata.
 - Pricing depends on Scryfall availability and can be missing for some prints.
 - Main pack-opening and Pack Battle state autosync to the database.
-- Saved sessions are browser-linked; there are no user accounts or cross-device sign-in yet.
-- No user accounts yet.
+- Signed-in users can sync opener and Pack Battle snapshots across browsers/devices.
+- Current user persistence still stores large JSON snapshots; collection, history, favorites, and battle stats are not normalized relational tables yet.
 - Render free-tier cold starts can make first backend requests slower.
 - Cold collector battles can still take longer because PackBattle preloads multiple Scryfall card pools before enabling start.
 
@@ -559,7 +588,7 @@ npm run optimize:wrappers
 
 - Expand the database schema beyond saved session snapshots.
 - Normalize saved session and Pack Battle snapshots into relational tables over time.
-- Add user accounts later.
+- Add richer account features such as profile management, password reset, and multiple named save slots.
 
 ### Performance And Reliability
 

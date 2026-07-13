@@ -1,3 +1,4 @@
+import { authHeaders } from './authApi';
 import { apiUrl } from './apiUrl';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
@@ -30,12 +31,32 @@ export async function updateSavedBattleSession(
 
 export async function deleteSavedBattleSession(id: string): Promise<void> {
   const response = await fetchWithTimeout(apiUrl(`/api/battle-sessions/${id}`), DEFAULT_REQUEST_TIMEOUT_MS, {
+    headers: authHeaders(),
     method: 'DELETE',
   });
 
   if (!response.ok && response.status !== 404) {
     throw new Error(`Saved battle session delete failed with status ${response.status}`);
   }
+}
+
+export async function fetchCurrentSavedBattleSession(): Promise<SavedBattleSessionResponse | null> {
+  const response = await fetchWithTimeout(apiUrl('/api/battle-sessions/current'), DEFAULT_REQUEST_TIMEOUT_MS, {
+    headers: {
+      Accept: 'application/json',
+      ...authHeaders(),
+    },
+  });
+
+  if (response.status === 404 || response.status === 401) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Current saved battle session request failed with status ${response.status}`);
+  }
+
+  return response.json();
 }
 
 async function sendSavedBattleSessionRequest(
@@ -51,6 +72,7 @@ async function sendSavedBattleSessionRequest(
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
+      ...authHeaders(),
     },
     method,
   });

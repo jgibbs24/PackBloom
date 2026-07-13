@@ -1,6 +1,7 @@
 package com.mtgpacksim.config;
 
 import com.mtgpacksim.pack.PackOpeningException;
+import com.mtgpacksim.auth.AuthException;
 import com.mtgpacksim.battle.SavedBattleSessionException;
 import com.mtgpacksim.scryfall.ScryfallException;
 import com.mtgpacksim.session.SavedSessionException;
@@ -60,6 +61,21 @@ public class ApiExceptionHandler {
                 .status(status)
                 .body(new ApiErrorResponse(
                         status == HttpStatus.NOT_FOUND ? "SAVED_SESSION_NOT_FOUND" : "SAVED_SESSION_INVALID",
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(AuthException.class)
+    ResponseEntity<ApiErrorResponse> handleAuthError(AuthException exception) {
+        HttpStatus status = "Sign in to access this resource.".equals(exception.getMessage())
+                || "Invalid authorization header.".equals(exception.getMessage())
+                ? HttpStatus.UNAUTHORIZED
+                : HttpStatus.BAD_REQUEST;
+
+        return ResponseEntity
+                .status(status)
+                .body(new ApiErrorResponse(
+                        status == HttpStatus.UNAUTHORIZED ? "AUTH_REQUIRED" : "AUTH_INVALID",
                         exception.getMessage()
                 ));
     }

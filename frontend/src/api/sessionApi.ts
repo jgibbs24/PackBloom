@@ -1,4 +1,5 @@
 import type { PersistedSessionState } from '../sessionStorage';
+import { authHeaders } from './authApi';
 import { apiUrl } from './apiUrl';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
@@ -22,6 +23,25 @@ export async function updateSavedSession(
   return sendSavedSessionRequest(apiUrl(`/api/sessions/${id}`), 'PUT', state);
 }
 
+export async function fetchCurrentSavedSession(): Promise<SavedSessionResponse | null> {
+  const response = await fetchWithTimeout(apiUrl('/api/sessions/current'), DEFAULT_REQUEST_TIMEOUT_MS, {
+    headers: {
+      Accept: 'application/json',
+      ...authHeaders(),
+    },
+  });
+
+  if (response.status === 404 || response.status === 401) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Current saved session request failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
 async function sendSavedSessionRequest(
   url: string,
   method: 'POST' | 'PUT',
@@ -35,6 +55,7 @@ async function sendSavedSessionRequest(
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
+      ...authHeaders(),
     },
     method,
   });

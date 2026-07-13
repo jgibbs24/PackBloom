@@ -3,6 +3,7 @@ package com.mtgpacksim.battle;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mtgpacksim.auth.AuthenticatedUser;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -23,7 +24,7 @@ public class SavedBattleSessionService {
         this.savedBattleSessionRepository = savedBattleSessionRepository;
     }
 
-    public SavedBattleSessionResponse createBattleSession(SavedBattleSessionRequest request) {
+    public SavedBattleSessionResponse createBattleSession(SavedBattleSessionRequest request, AuthenticatedUser user) {
         validateRequest(request);
 
         SavedBattleSessionEntity entity = new SavedBattleSessionEntity(
@@ -31,32 +32,58 @@ public class SavedBattleSessionService {
                 normalizeDisplayName(request.displayName()),
                 serializeState(request.state())
         );
+        if (user != null) {
+            entity.setUserId(user.id());
+        }
 
         return toResponse(savedBattleSessionRepository.save(entity));
     }
 
-    public SavedBattleSessionResponse getBattleSession(UUID id) {
-        return savedBattleSessionRepository.findById(id)
+    public SavedBattleSessionResponse getCurrentBattleSession(AuthenticatedUser user) {
+        return savedBattleSessionRepository.findFirstByUserIdOrderByUpdatedAtDesc(user.id())
                 .map(this::toResponse)
                 .orElseThrow(() -> new SavedBattleSessionException("Saved battle session not found."));
     }
 
-    public SavedBattleSessionResponse updateBattleSession(UUID id, SavedBattleSessionRequest request) {
+    public SavedBattleSessionResponse getBattleSession(UUID id, AuthenticatedUser user) {
+        return savedBattleSessionRepository.findById(id)
+                .map((entity) -> requireAccess(entity, user))
+                .map(this::toResponse)
+                .orElseThrow(() -> new SavedBattleSessionException("Saved battle session not found."));
+    }
+
+    public SavedBattleSessionResponse updateBattleSession(UUID id, SavedBattleSessionRequest request, AuthenticatedUser user) {
         validateRequest(request);
 
         SavedBattleSessionEntity entity = savedBattleSessionRepository.findById(id)
                 .orElseThrow(() -> new SavedBattleSessionException("Saved battle session not found."));
 
+        requireAccess(entity, user);
+        if (user != null && entity.getUserId() == null) {
+            entity.setUserId(user.id());
+        }
         entity.setDisplayName(normalizeDisplayName(request.displayName()));
         entity.setStateJson(serializeState(request.state()));
         return toResponse(savedBattleSessionRepository.save(entity));
     }
 
-    public void deleteBattleSession(UUID id) {
-        if (!savedBattleSessionRepository.existsById(id)) {
-            throw new SavedBattleSessionException("Saved battle session not found.");
+    public void deleteBattleSession(UUID id, AuthenticatedUser user) {
+        SavedBattleSessionEntity entity = savedBattleSessionRepository.findById(id)
+                .orElseThrow(() -> new SavedBattleSessionException("Saved battle session not found."));
+        requireAccess(entity, user);
+        savedBattleSessionRepository.delete(entity);
+    }
+
+    private SavedBattleSessionEntity requireAccess(SavedBattleSessionEntity entity, AuthenticatedUser user) {
+        if (entity.getUserId() == null) {
+            return entity;
         }
-        savedBattleSessionRepository.deleteById(id);
+
+        if (user != null && entity.getUserId().equals(user.id())) {
+            return entity;
+        }
+
+        throw new SavedBattleSessionException("Saved battle session not found.");
     }
 
     private void validateRequest(SavedBattleSessionRequest request) {
