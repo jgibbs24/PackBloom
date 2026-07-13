@@ -66,9 +66,11 @@ frontend/  React + TypeScript + Vite UI
 - Database-backed saved session autosync for the main pack-opening session.
 - Database-backed Pack Battle stats/history autosync.
 - Optional user accounts with register/sign-in/sign-out.
+- Account/profile panel with email, display name, sync status, and sign out.
 - Account-scoped cloud sync for opener sessions and Pack Battle snapshots.
+- Initial normalized database tables for pulled cards, pack history, chase cards, favorites, and battle history.
 - Reset controls for local session state.
-- GitHub Actions CI for backend tests, frontend build, and frontend tests.
+- GitHub Actions CI for backend tests, frontend build, frontend tests, and browser E2E tests.
 
 ## Pack Battle Mode
 
@@ -124,6 +126,7 @@ Current Pack Battle features:
 - Vite
 - TailwindCSS
 - Vitest
+- Playwright
 - Sharp for pack-wrapper image optimization
 
 ## Requirements
@@ -261,6 +264,13 @@ cd "C:\Users\your_name\Documents\MTG-Pack-Simulator\frontend"
 npm.cmd run test
 ```
 
+### Windows Frontend E2E Tests
+
+```powershell
+cd "C:\Users\your_name\Documents\MTG-Pack-Simulator\frontend"
+npm.cmd run e2e
+```
+
 ### macOS / Linux Backend Compile
 
 ```bash
@@ -288,6 +298,13 @@ npm run build
 ```bash
 cd ~/Documents/MTG-Pack-Simulator/frontend
 npm run test
+```
+
+### macOS / Linux Frontend E2E Tests
+
+```bash
+cd ~/Documents/MTG-Pack-Simulator/frontend
+npm run e2e
 ```
 
 ## API Endpoints
@@ -434,7 +451,7 @@ Deletes a saved Pack Battle snapshot.
 - `SavedBattleSessionController` and `SavedBattleSessionService` store browser-linked Pack Battle snapshots in the database.
 - `AuthController` and `AuthService` provide account registration, login, logout, and bearer-token lookup.
 - Passwords are stored as BCrypt hashes; raw auth tokens are returned once and stored server-side only as SHA-256 hashes.
-- Flyway owns schema creation, including saved snapshots, user accounts, auth tokens, and nullable user ownership columns.
+- Flyway owns schema creation, including saved snapshots, user accounts, auth tokens, nullable user ownership columns, and schema-first normalized user-data tables.
 - Raw Scryfall JSON is not returned to the frontend.
 - Pack definitions and card-pool cache state are still in memory.
 
@@ -557,7 +574,7 @@ npm run optimize:wrappers
 - Pricing depends on Scryfall availability and can be missing for some prints.
 - Main pack-opening and Pack Battle state autosync to the database.
 - Signed-in users can sync opener and Pack Battle snapshots across browsers/devices.
-- Current user persistence still stores large JSON snapshots; collection, history, favorites, and battle stats are not normalized relational tables yet.
+- Current user sync still stores large JSON snapshots for active app restore; normalized tables for pulled cards, pack history, chase cards, favorites, and battle history exist as schema groundwork and still need app-level read/write integration.
 - Render free-tier cold starts can make first backend requests slower.
 - Cold collector battles can still take longer because PackBattle preloads multiple Scryfall card pools before enabling start.
 
@@ -586,8 +603,8 @@ npm run optimize:wrappers
 
 ### Persistence And Infrastructure
 
-- Expand the database schema beyond saved session snapshots.
-- Normalize saved session and Pack Battle snapshots into relational tables over time.
+- Wire normalized pulled-card, pack-history, chase-card, favorite, and battle-history tables into app read/write flows.
+- Normalize saved session and Pack Battle snapshots into relational data over time.
 - Add richer account features such as profile management, password reset, and multiple named save slots.
 
 ### Performance And Reliability
@@ -600,6 +617,7 @@ npm run optimize:wrappers
 - Keep GitHub Actions CI green for backend and frontend checks.
 - Add more backend pack-generation tests.
 - Add frontend component tests for battle, binder, history, and reveal flows.
+- Expand Playwright coverage for full auth sync, Pack Battle, and cross-browser restore flows.
 - Add more comments around complex pack-generation logic.
 
 ## Disclaimer

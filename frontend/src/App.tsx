@@ -14,6 +14,7 @@ import type { AppStep } from './components/PackOpener';
 export default function App() {
   const [authSession, setAuthSession] = useState<AuthSession | null>(() => loadAuthSession());
   const [isAuthPanelOpen, setIsAuthPanelOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [appStep, setAppStep] = useState<AppStep>('start');
 
   return (
@@ -49,23 +50,13 @@ export default function App() {
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {authSession ? (
-                <>
-                  <span className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-stone-200">
-                    {authSession.user.displayName}
-                  </span>
-                  <button
-                    className="rounded-md border border-white/15 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-stone-200 transition hover:border-ember hover:text-ember"
-                    onClick={() => {
-                      logoutAuthSession().finally(() => {
-                        clearAuthSession();
-                        setAuthSession(null);
-                      });
-                    }}
-                    type="button"
-                  >
-                    Sign out
-                  </button>
-                </>
+                <button
+                  className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-stone-200 transition hover:border-ember hover:text-ember"
+                  onClick={() => setIsProfileOpen(true)}
+                  type="button"
+                >
+                  {authSession.user.displayName}
+                </button>
               ) : (
                 <button
                   className="rounded-md border border-ember/35 bg-ember/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-ember transition hover:border-ember hover:bg-ember/15"
@@ -90,7 +81,87 @@ export default function App() {
           }}
         />
       )}
+      {authSession && isProfileOpen && (
+        <ProfilePanel
+          authSession={authSession}
+          onClose={() => setIsProfileOpen(false)}
+          onSignOut={() => {
+            logoutAuthSession().finally(() => {
+              clearAuthSession();
+              setAuthSession(null);
+              setIsProfileOpen(false);
+            });
+          }}
+        />
+      )}
     </main>
+  );
+}
+
+function ProfilePanel({
+  authSession,
+  onClose,
+  onSignOut,
+}: {
+  authSession: AuthSession;
+  onClose: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-lg border border-white/10 bg-stone-950 p-5 shadow-card">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-ember">Account</p>
+            <h2 className="mt-2 text-2xl font-black text-white">{authSession.user.displayName}</h2>
+          </div>
+          <button
+            className="rounded-md border border-white/15 px-3 py-2 text-sm font-bold text-stone-300 transition hover:border-ember hover:text-ember"
+            onClick={onClose}
+            type="button"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          <ProfileRow label="Display name" value={authSession.user.displayName} />
+          <ProfileRow label="Email" value={authSession.user.email} />
+          <div className="rounded-md border border-emerald-300/30 bg-emerald-400/10 px-4 py-3">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-200">Sync status</p>
+            <p className="mt-1 text-sm font-semibold text-emerald-50">
+              Account sync is enabled. Opener sessions and Pack Battle stats save to this account when changes happen.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-4">
+          <button
+            className="rounded-md border border-white/15 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em] text-stone-200 transition hover:border-white/35 hover:bg-white/10"
+            onClick={onClose}
+            type="button"
+          >
+            Done
+          </button>
+          <button
+            className="rounded-md border border-red-300/35 bg-red-500/10 px-4 py-3 text-sm font-bold uppercase tracking-[0.14em] text-red-100 transition hover:border-red-200 hover:bg-red-500/15"
+            onClick={onSignOut}
+            type="button"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.04] px-4 py-3">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">{label}</p>
+      <p className="mt-1 break-words text-sm font-semibold text-white">{value}</p>
+    </div>
   );
 }
 
