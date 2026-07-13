@@ -36,7 +36,7 @@ export async function fetchCurrentSavedSession(): Promise<SavedSessionResponse |
   }
 
   if (!response.ok) {
-    throw new Error(`Current saved session request failed with status ${response.status}`);
+    throw new Error(await readApiError(response) ?? `Current saved session request failed with status ${response.status}`);
   }
 
   return response.json();
@@ -61,10 +61,19 @@ async function sendSavedSessionRequest(
   });
 
   if (!response.ok) {
-    throw new Error(`Saved session request failed with status ${response.status}`);
+    throw new Error(await readApiError(response) ?? `Saved session request failed with status ${response.status}`);
   }
 
   return response.json();
+}
+
+async function readApiError(response: Response): Promise<string | null> {
+  try {
+    const body = await response.json() as Partial<{ message: string }>;
+    return body.message ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function fetchWithTimeout(

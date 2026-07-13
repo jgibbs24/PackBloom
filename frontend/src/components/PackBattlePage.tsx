@@ -44,6 +44,7 @@ type BattleResult = {
 
 type BattleProgress = 'idle' | 'first' | 'second';
 type BattleRevealMode = 'all' | 'one-by-one';
+type BattleCloudSyncStatus = 'idle' | 'loading' | 'syncing' | 'saved' | 'error';
 
 type BattleSessionStats = {
   battles: number;
@@ -109,6 +110,8 @@ export function PackBattlePage({
   const [battleRevealMode, setBattleRevealMode] = useState<BattleRevealMode>('all');
   const [revealedCount, setRevealedCount] = useState(0);
   const [hasCountedBattle, setHasCountedBattle] = useState(false);
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<BattleCloudSyncStatus>('idle');
   const persistedBattleSession = useMemo(() => loadPersistedBattleSession(), []);
   const [battleStats, setBattleStats] = useState<BattleSessionStats>(
     persistedBattleSession?.battleStats ?? initialBattleStats,
@@ -153,13 +156,20 @@ export function PackBattlePage({
 
   useEffect(() => {
     if (!authSession) {
+      setCloudSyncError(null);
+      setCloudSyncStatus('idle');
       return;
     }
 
     let ignore = false;
+    setCloudSyncError(null);
+    setCloudSyncStatus('loading');
 
     fetchCurrentSavedBattleSession().then((savedSession) => {
       if (ignore || !savedSession) {
+        if (!ignore) {
+          setCloudSyncStatus('idle');
+        }
         return;
       }
 
@@ -174,7 +184,13 @@ export function PackBattlePage({
           ? (savedSession.state.battleHistory as BattleHistoryEntry[]).slice(0, BATTLE_HISTORY_LIMIT)
           : []);
       }
-    }).catch(() => undefined);
+      setCloudSyncStatus('saved');
+    }).catch((caughtError) => {
+      if (!ignore) {
+        setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to load your battle save.');
+        setCloudSyncStatus('error');
+      }
+    });
 
     return () => {
       ignore = true;
@@ -190,7 +206,20 @@ export function PackBattlePage({
       const remoteBattleSessionId = remoteBattleSessionIdRef.current;
 
       if (remoteBattleSessionId) {
-        updateSavedBattleSession(remoteBattleSessionId, persistedBattleSessionPayload).catch(() => undefined);
+        if (authSession) {
+          setCloudSyncError(null);
+          setCloudSyncStatus('syncing');
+        }
+        updateSavedBattleSession(remoteBattleSessionId, persistedBattleSessionPayload).then(() => {
+          if (authSession) {
+            setCloudSyncStatus('saved');
+          }
+        }).catch((caughtError) => {
+          if (authSession) {
+            setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to save your battle session.');
+            setCloudSyncStatus('error');
+          }
+        });
         return;
       }
 
@@ -199,16 +228,28 @@ export function PackBattlePage({
       }
 
       isCreatingRemoteBattleSessionRef.current = true;
+      if (authSession) {
+        setCloudSyncError(null);
+        setCloudSyncStatus('syncing');
+      }
       createSavedBattleSession(persistedBattleSessionPayload).then((savedSession) => {
         remoteBattleSessionIdRef.current = savedSession.id;
         saveRemoteBattleSessionId(savedSession.id);
-      }).catch(() => undefined).finally(() => {
+        if (authSession) {
+          setCloudSyncStatus('saved');
+        }
+      }).catch((caughtError) => {
+        if (authSession) {
+          setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to create your battle save.');
+          setCloudSyncStatus('error');
+        }
+      }).finally(() => {
         isCreatingRemoteBattleSessionRef.current = false;
       });
     }, 1500);
 
     return () => window.clearTimeout(timeoutId);
-  }, [isEngineReady, persistedBattleSessionPayload]);
+  }, [authSession, isEngineReady, persistedBattleSessionPayload]);
 
   async function handleStartBattle() {
     if (!canStartBattle || !selectedSet) {
@@ -413,6 +454,13 @@ export function PackBattlePage({
                 One by one
               </button>
             </div>
+            {authSession && (
+              <BattleCloudSyncBadge
+                displayName={authSession.user.displayName}
+                error={cloudSyncError}
+                status={cloudSyncStatus}
+              />
+            )}
             {isLoading && (
               <p className="text-sm font-semibold text-amber-100">
                 {progress === 'second'
@@ -857,6 +905,46 @@ function BattleStat({ label, value }: { label: string; value: string }) {
     <div className="rounded-md bg-black/20 p-3">
       <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-stone-500">{label}</p>
       <p className="mt-1 line-clamp-2 text-sm font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
+function BattleCloudSyncBadge({
+  displayName,
+  error,
+  status,
+}: {
+  displayName: string;
+  error: string | null;
+  status: BattleCloudSyncStatus;
+}) {
+  const statusConfig = {
+    error: {
+      className: 'border-red-400/35 bg-red-500/10 text-red-100',
+      label: `Battle sync failed${error ? `: ${error}` : '.'}`,
+    },
+    idle: {
+      className: 'border-white/10 bg-white/[0.04] text-stone-300',
+      label: `Signed in as ${displayName}. Battle sync will start after your next battle.`,
+    },
+    loading: {
+      className: 'border-sky-300/30 bg-sky-400/10 text-sky-100',
+      label: 'Loading battle save...',
+    },
+    saved: {
+      className: 'border-emerald-300/35 bg-emerald-400/10 text-emerald-100',
+      label: `Battle saved to ${displayName}'s account.`,
+    },
+    syncing: {
+      className: 'border-ember/35 bg-ember/10 text-amber-100',
+      label: 'Saving battle to account...',
+    },
+  } satisfies Record<BattleCloudSyncStatus, { className: string; label: string }>;
+  const config = statusConfig[status];
+
+  return (
+    <div className={`rounded-md border px-4 py-3 text-sm font-semibold ${config.className}`}>
+      {config.label}
     </div>
   );
 }

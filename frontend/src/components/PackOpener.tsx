@@ -43,6 +43,7 @@ type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
 type ActiveView = 'opener' | 'binder' | 'history';
 type EngineStatus = 'checking' | 'ready' | 'waking' | 'unavailable';
+type CloudSyncStatus = 'idle' | 'loading' | 'syncing' | 'saved' | 'error';
 export type AppMode = 'opener' | 'battle';
 export type AppStep = 'start' | 'select-mode' | 'select-set' | 'open-pack' | 'pack-battle';
 
@@ -103,6 +104,8 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
   const [isSfxEnabled, setIsSfxEnabled] = useState(persistedSession?.isSfxEnabled ?? persistedSession?.isAudioEnabled ?? true);
   const [chaseCardName, setChaseCardName] = useState(persistedSession?.chaseCardName ?? '');
   const [chaseHitCard, setChaseHitCard] = useState<CardDto | null>(null);
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<CloudSyncStatus>('idle');
   const persistedSessionPayload = useMemo<PersistedSessionState>(() => ({
     activeView,
     allPulledCards,
@@ -160,13 +163,20 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
 
   useEffect(() => {
     if (!authSession) {
+      setCloudSyncError(null);
+      setCloudSyncStatus('idle');
       return;
     }
 
     let ignore = false;
+    setCloudSyncError(null);
+    setCloudSyncStatus('loading');
 
     fetchCurrentSavedSession().then((savedSession) => {
       if (ignore || !savedSession) {
+        if (!ignore) {
+          setCloudSyncStatus('idle');
+        }
         return;
       }
 
@@ -176,7 +186,13 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
       if (isEmptySession(persistedSessionPayload)) {
         applyPersistedSessionState(savedSession.state);
       }
-    }).catch(() => undefined);
+      setCloudSyncStatus('saved');
+    }).catch((caughtError) => {
+      if (!ignore) {
+        setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to load your account save.');
+        setCloudSyncStatus('error');
+      }
+    });
 
     return () => {
       ignore = true;
@@ -192,7 +208,20 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
       const remoteSessionId = remoteSessionIdRef.current;
 
       if (remoteSessionId) {
-        updateSavedSession(remoteSessionId, persistedSessionPayload).catch(() => undefined);
+        if (authSession) {
+          setCloudSyncError(null);
+          setCloudSyncStatus('syncing');
+        }
+        updateSavedSession(remoteSessionId, persistedSessionPayload).then(() => {
+          if (authSession) {
+            setCloudSyncStatus('saved');
+          }
+        }).catch((caughtError) => {
+          if (authSession) {
+            setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to save your session.');
+            setCloudSyncStatus('error');
+          }
+        });
         return;
       }
 
@@ -201,16 +230,28 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
       }
 
       isCreatingRemoteSessionRef.current = true;
+      if (authSession) {
+        setCloudSyncError(null);
+        setCloudSyncStatus('syncing');
+      }
       createSavedSession(persistedSessionPayload).then((savedSession) => {
         remoteSessionIdRef.current = savedSession.id;
         saveRemoteSessionId(savedSession.id);
-      }).catch(() => undefined).finally(() => {
+        if (authSession) {
+          setCloudSyncStatus('saved');
+        }
+      }).catch((caughtError) => {
+        if (authSession) {
+          setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to create your account save.');
+          setCloudSyncStatus('error');
+        }
+      }).finally(() => {
         isCreatingRemoteSessionRef.current = false;
       });
     }, 1500);
 
     return () => window.clearTimeout(timeoutId);
-  }, [engineStatus, persistedSessionPayload]);
+  }, [authSession, engineStatus, persistedSessionPayload]);
 
   useEffect(() => {
     let ignore = false;
@@ -817,6 +858,14 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
                 </div>
               </div>
 
+              {authSession && (
+                <CloudSyncBadge
+                  displayName={authSession.user.displayName}
+                  error={cloudSyncError}
+                  status={cloudSyncStatus}
+                />
+              )}
+
               {!isEngineReady && (
                 <div className="mt-4 rounded-md border border-ember/25 bg-ember/10 px-4 py-3 text-sm font-semibold text-amber-100">
                   {getEngineStatusMessage(engineStatus, engineWaitSeconds)} You can choose a set now; pack opening unlocks when the engine responds.
@@ -1102,6 +1151,46 @@ function AudioToggle({ isChecked, label, onToggle }: { isChecked: boolean; label
         <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${isChecked ? 'left-5' : 'left-1'}`} />
       </span>
     </button>
+  );
+}
+
+function CloudSyncBadge({
+  displayName,
+  error,
+  status,
+}: {
+  displayName: string;
+  error: string | null;
+  status: CloudSyncStatus;
+}) {
+  const statusConfig = {
+    error: {
+      className: 'border-red-400/35 bg-red-500/10 text-red-100',
+      label: `Account sync failed${error ? `: ${error}` : '.'}`,
+    },
+    idle: {
+      className: 'border-white/10 bg-white/[0.04] text-stone-300',
+      label: `Signed in as ${displayName}. Account sync will start after your next change.`,
+    },
+    loading: {
+      className: 'border-sky-300/30 bg-sky-400/10 text-sky-100',
+      label: 'Loading account save...',
+    },
+    saved: {
+      className: 'border-emerald-300/35 bg-emerald-400/10 text-emerald-100',
+      label: `Saved to ${displayName}'s account.`,
+    },
+    syncing: {
+      className: 'border-ember/35 bg-ember/10 text-amber-100',
+      label: 'Saving to account...',
+    },
+  } satisfies Record<CloudSyncStatus, { className: string; label: string }>;
+  const config = statusConfig[status];
+
+  return (
+    <div className={`mt-4 rounded-md border px-4 py-3 text-sm font-semibold ${config.className}`}>
+      {config.label}
+    </div>
   );
 }
 

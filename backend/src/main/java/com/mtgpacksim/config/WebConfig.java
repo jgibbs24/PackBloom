@@ -24,7 +24,7 @@ public class WebConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         // Deployment hosts provide this list by environment variable; local dev keeps the Vite origins.
         configuration.setAllowedOrigins(allowedOrigins);
-        configuration.setAllowedMethods(List.of("GET", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

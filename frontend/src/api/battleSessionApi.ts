@@ -36,7 +36,7 @@ export async function deleteSavedBattleSession(id: string): Promise<void> {
   });
 
   if (!response.ok && response.status !== 404) {
-    throw new Error(`Saved battle session delete failed with status ${response.status}`);
+    throw new Error(await readApiError(response) ?? `Saved battle session delete failed with status ${response.status}`);
   }
 }
 
@@ -53,7 +53,7 @@ export async function fetchCurrentSavedBattleSession(): Promise<SavedBattleSessi
   }
 
   if (!response.ok) {
-    throw new Error(`Current saved battle session request failed with status ${response.status}`);
+    throw new Error(await readApiError(response) ?? `Current saved battle session request failed with status ${response.status}`);
   }
 
   return response.json();
@@ -78,10 +78,19 @@ async function sendSavedBattleSessionRequest(
   });
 
   if (!response.ok) {
-    throw new Error(`Saved battle session request failed with status ${response.status}`);
+    throw new Error(await readApiError(response) ?? `Saved battle session request failed with status ${response.status}`);
   }
 
   return response.json();
+}
+
+async function readApiError(response: Response): Promise<string | null> {
+  try {
+    const body = await response.json() as Partial<{ message: string }>;
+    return body.message ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function fetchWithTimeout(
