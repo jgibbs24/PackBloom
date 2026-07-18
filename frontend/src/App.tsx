@@ -78,7 +78,12 @@ export default function App() {
           </div>
         </header>
 
-        <PackOpener appStep={appStep} authSession={authSession} setAppStep={setAppStep} />
+      <PackOpener
+        key={authSession?.user.id ?? 'anonymous'}
+        appStep={appStep}
+        authSession={authSession}
+        setAppStep={setAppStep}
+      />
       </section>
       {isAuthPanelOpen && (
         <AuthPanel

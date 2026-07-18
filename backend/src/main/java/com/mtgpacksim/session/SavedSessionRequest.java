@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 public record SavedSessionRequest(
         String displayName,
-        JsonNode state
+        JsonNode state,
+        Long expectedRevision
 ) {
 }

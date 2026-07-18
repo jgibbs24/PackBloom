@@ -1,7 +1,6 @@
 package com.mtgpacksim.battle;
 
 import com.mtgpacksim.auth.AuthService;
-import com.mtgpacksim.auth.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,7 +36,10 @@ public class SavedBattleSessionController {
     ) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(savedBattleSessionService.createBattleSession(request, optionalUser(authorizationHeader)));
+                .body(savedBattleSessionService.createBattleSession(
+                        request,
+                        authService.requireUser(authorizationHeader)
+                ));
     }
 
     @GetMapping("/current")
@@ -49,12 +51,34 @@ public class SavedBattleSessionController {
         ));
     }
 
+    @PutMapping("/current")
+    public ResponseEntity<SavedBattleSessionResponse> saveCurrentBattleSession(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @RequestBody SavedBattleSessionRequest request
+    ) {
+        return ResponseEntity.ok(savedBattleSessionService.saveCurrentBattleSession(
+                request,
+                authService.requireUser(authorizationHeader)
+        ));
+    }
+
+    @DeleteMapping("/current")
+    public ResponseEntity<Void> deleteCurrentBattleSession(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader
+    ) {
+        savedBattleSessionService.deleteCurrentBattleSession(authService.requireUser(authorizationHeader));
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<SavedBattleSessionResponse> getBattleSession(
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
             @PathVariable UUID id
     ) {
-        return ResponseEntity.ok(savedBattleSessionService.getBattleSession(id, optionalUser(authorizationHeader)));
+        return ResponseEntity.ok(savedBattleSessionService.getBattleSession(
+                id,
+                authService.requireUser(authorizationHeader)
+        ));
     }
 
     @PutMapping("/{id}")
@@ -66,7 +90,7 @@ public class SavedBattleSessionController {
         return ResponseEntity.ok(savedBattleSessionService.updateBattleSession(
                 id,
                 request,
-                optionalUser(authorizationHeader)
+                authService.requireUser(authorizationHeader)
         ));
     }
 
@@ -75,11 +99,7 @@ public class SavedBattleSessionController {
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
             @PathVariable UUID id
     ) {
-        savedBattleSessionService.deleteBattleSession(id, optionalUser(authorizationHeader));
+        savedBattleSessionService.deleteBattleSession(id, authService.requireUser(authorizationHeader));
         return ResponseEntity.noContent().build();
-    }
-
-    private AuthenticatedUser optionalUser(String authorizationHeader) {
-        return authService.authenticate(authorizationHeader).orElse(null);
     }
 }

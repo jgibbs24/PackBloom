@@ -8,19 +8,16 @@ export type SavedSessionResponse = {
   createdAt: string;
   displayName: string;
   id: string;
+  revision: number;
   state: PersistedSessionState;
   updatedAt: string;
 };
 
-export async function createSavedSession(state: PersistedSessionState): Promise<SavedSessionResponse> {
-  return sendSavedSessionRequest(apiUrl('/api/sessions'), 'POST', state);
-}
-
-export async function updateSavedSession(
-  id: string,
+export async function saveCurrentSavedSession(
   state: PersistedSessionState,
+  expectedRevision: number | null,
 ): Promise<SavedSessionResponse> {
-  return sendSavedSessionRequest(apiUrl(`/api/sessions/${id}`), 'PUT', state);
+  return sendSavedSessionRequest(apiUrl('/api/sessions/current'), state, expectedRevision);
 }
 
 export async function fetchCurrentSavedSession(): Promise<SavedSessionResponse | null> {
@@ -31,7 +28,7 @@ export async function fetchCurrentSavedSession(): Promise<SavedSessionResponse |
     },
   });
 
-  if (response.status === 404 || response.status === 401) {
+  if (response.status === 404) {
     return null;
   }
 
@@ -44,12 +41,13 @@ export async function fetchCurrentSavedSession(): Promise<SavedSessionResponse |
 
 async function sendSavedSessionRequest(
   url: string,
-  method: 'POST' | 'PUT',
   state: PersistedSessionState,
+  expectedRevision: number | null,
 ): Promise<SavedSessionResponse> {
   const response = await fetchWithTimeout(url, DEFAULT_REQUEST_TIMEOUT_MS, {
     body: JSON.stringify({
       displayName: 'PackBloom Session',
+      expectedRevision,
       state,
     }),
     headers: {
@@ -57,7 +55,7 @@ async function sendSavedSessionRequest(
       'Content-Type': 'application/json',
       ...authHeaders(),
     },
-    method,
+    method: 'PUT',
   });
 
   if (!response.ok) {

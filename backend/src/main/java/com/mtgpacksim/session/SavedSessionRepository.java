@@ -6,5 +6,5 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface SavedSessionRepository extends JpaRepository<SavedSessionEntity, UUID> {
-    Optional<SavedSessionEntity> findFirstByUserIdOrderByUpdatedAtDesc(UUID userId);
+    Optional<SavedSessionEntity> findByUserId(UUID userId);
 }

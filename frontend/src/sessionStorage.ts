@@ -21,17 +21,18 @@ export type PersistedSessionState = {
   sessionStats: SessionStats;
 };
 
-const SESSION_STORAGE_KEY = 'packbloom-session-v1';
-const REMOTE_SESSION_ID_KEY = 'packbloom-remote-session-id-v1';
+const LEGACY_SESSION_STORAGE_KEY = 'packbloom-session-v1';
+const SESSION_STORAGE_KEY_PREFIX = 'packbloom-session-v2';
 const SESSION_STORAGE_VERSION = 1;
 
 type StoredSessionState = PersistedSessionState & {
   version: number;
 };
 
-export function loadPersistedSession(): PersistedSessionState | null {
+export function loadPersistedSession(userId: string | null = null): PersistedSessionState | null {
   try {
-    const rawSession = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    const rawSession = window.localStorage.getItem(sessionStorageKey(userId))
+      ?? (userId === null ? window.localStorage.getItem(LEGACY_SESSION_STORAGE_KEY) : null);
     if (!rawSession) {
       return null;
     }
@@ -72,30 +73,24 @@ export function loadPersistedSession(): PersistedSessionState | null {
   }
 }
 
-export function savePersistedSession(session: PersistedSessionState) {
+export function savePersistedSession(session: PersistedSessionState, userId: string | null = null) {
   const storedSession: StoredSessionState = {
     ...session,
     version: SESSION_STORAGE_VERSION,
   };
 
-  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(storedSession));
+  window.localStorage.setItem(sessionStorageKey(userId), JSON.stringify(storedSession));
 }
 
-export function clearPersistedSession() {
-  window.localStorage.removeItem(SESSION_STORAGE_KEY);
-  clearRemoteSessionId();
+export function clearPersistedSession(userId: string | null = null) {
+  window.localStorage.removeItem(sessionStorageKey(userId));
+  if (userId === null) {
+    window.localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY);
+  }
 }
 
-export function loadRemoteSessionId(): string | null {
-  return window.localStorage.getItem(REMOTE_SESSION_ID_KEY);
-}
-
-export function saveRemoteSessionId(id: string) {
-  window.localStorage.setItem(REMOTE_SESSION_ID_KEY, id);
-}
-
-export function clearRemoteSessionId() {
-  window.localStorage.removeItem(REMOTE_SESSION_ID_KEY);
+function sessionStorageKey(userId: string | null): string {
+  return `${SESSION_STORAGE_KEY_PREFIX}:${userId === null ? 'anonymous' : `user:${userId}`}`;
 }
 
 function isPersistedActiveView(activeView: unknown): activeView is PersistedActiveView {

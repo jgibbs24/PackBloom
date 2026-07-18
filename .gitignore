@@ -4,3 +4,4 @@ frontend/dist/
 frontend/.vite/
 *.log
 PROJECT_NOTES.md
+docs/repository-audit/

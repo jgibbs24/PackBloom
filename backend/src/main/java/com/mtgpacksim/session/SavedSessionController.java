@@ -1,7 +1,6 @@
 package com.mtgpacksim.session;
 
 import com.mtgpacksim.auth.AuthService;
-import com.mtgpacksim.auth.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,7 +33,7 @@ public class SavedSessionController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(savedSessionService.createSession(
                 request,
-                optionalUser(authorizationHeader)
+                authService.requireUser(authorizationHeader)
         ));
     }
 
@@ -45,12 +44,31 @@ public class SavedSessionController {
         return ResponseEntity.ok(savedSessionService.getCurrentSession(authService.requireUser(authorizationHeader)));
     }
 
+    @PutMapping("/current")
+    public ResponseEntity<SavedSessionResponse> saveCurrentSession(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @RequestBody SavedSessionRequest request
+    ) {
+        return ResponseEntity.ok(savedSessionService.saveCurrentSession(
+                request,
+                authService.requireUser(authorizationHeader)
+        ));
+    }
+
+    @DeleteMapping("/current")
+    public ResponseEntity<Void> deleteCurrentSession(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader
+    ) {
+        savedSessionService.deleteCurrentSession(authService.requireUser(authorizationHeader));
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<SavedSessionResponse> getSession(
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
             @PathVariable UUID id
     ) {
-        return ResponseEntity.ok(savedSessionService.getSession(id, optionalUser(authorizationHeader)));
+        return ResponseEntity.ok(savedSessionService.getSession(id, authService.requireUser(authorizationHeader)));
     }
 
     @PutMapping("/{id}")
@@ -59,7 +77,11 @@ public class SavedSessionController {
             @PathVariable UUID id,
             @RequestBody SavedSessionRequest request
     ) {
-        return ResponseEntity.ok(savedSessionService.updateSession(id, request, optionalUser(authorizationHeader)));
+        return ResponseEntity.ok(savedSessionService.updateSession(
+                id,
+                request,
+                authService.requireUser(authorizationHeader)
+        ));
     }
 
     @DeleteMapping("/{id}")
@@ -67,11 +89,7 @@ public class SavedSessionController {
             @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
             @PathVariable UUID id
     ) {
-        savedSessionService.deleteSession(id, optionalUser(authorizationHeader));
+        savedSessionService.deleteSession(id, authService.requireUser(authorizationHeader));
         return ResponseEntity.noContent().build();
-    }
-
-    private AuthenticatedUser optionalUser(String authorizationHeader) {
-        return authService.authenticate(authorizationHeader).orElse(null);
     }
 }

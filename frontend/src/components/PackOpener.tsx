@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AuthSession } from '../api/authApi';
 import { fetchApiHealth, fetchSupportedSets, fetchWarmupStatus, openPack, warmUpPack } from '../api/packApi';
 import type { WarmupStatusDto } from '../api/packApi';
-import { createSavedSession, fetchCurrentSavedSession, updateSavedSession } from '../api/sessionApi';
+import { fetchCurrentSavedSession, saveCurrentSavedSession } from '../api/sessionApi';
 import { playFeedbackSound, syncBackgroundMusic } from '../audioFeedback';
 import { formatCardPrice } from '../cardPrice';
 import { BOOSTER_OPTIONS, type BoosterType, getBoosterOption } from '../packLabels';
@@ -11,14 +11,14 @@ import { preloadPackWrapperImages } from '../packWrapperImages';
 import {
   clearPersistedSession,
   loadPersistedSession,
-  loadRemoteSessionId,
   savePersistedSession,
-  saveRemoteSessionId,
 } from '../sessionStorage';
 import type { PersistedSessionState } from '../sessionStorage';
 import { getSetTheme } from '../setThemes';
 import { FALLBACK_SUPPORTED_SETS } from '../supportedSets';
 import type { CardDto, OpenedPackDto, PackHistoryEntry, SessionStats, SupportedSetDto } from '../types/pack';
+import { useAccountSnapshotSync } from '../useAccountSnapshotSync';
+import type { SnapshotSyncStatus } from '../useAccountSnapshotSync';
 import { BinderPage } from './BinderPage';
 import { CardGrid } from './CardGrid';
 import { CardPreviewModal } from './CardPreviewModal';
@@ -43,7 +43,6 @@ type RevealMode = 'all' | 'one-by-one';
 type RevealPhase = 'idle' | 'revealing' | 'complete';
 type ActiveView = 'opener' | 'binder' | 'history';
 type EngineStatus = 'checking' | 'ready' | 'waking' | 'unavailable';
-type CloudSyncStatus = 'idle' | 'loading' | 'syncing' | 'saved' | 'error';
 export type AppMode = 'opener' | 'battle';
 export type AppStep = 'start' | 'select-mode' | 'select-set' | 'open-pack' | 'pack-battle';
 
@@ -65,9 +64,8 @@ const initialSessionStats: SessionStats = {
 };
 
 export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps) {
-  const persistedSession = useMemo(() => loadPersistedSession(), []);
-  const remoteSessionIdRef = useRef<string | null>(loadRemoteSessionId());
-  const isCreatingRemoteSessionRef = useRef(false);
+  const accountId = authSession?.user.id ?? null;
+  const persistedSession = useMemo(() => loadPersistedSession(accountId), [accountId]);
   const [sets, setSets] = useState<SupportedSetDto[]>(FALLBACK_SUPPORTED_SETS);
   const [selectedSetCode, setSelectedSetCode] = useState(persistedSession?.selectedSetCode ?? DEFAULT_SET_CODE);
   const [selectedMode, setSelectedMode] = useState<AppMode>('opener');
@@ -104,8 +102,6 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
   const [isSfxEnabled, setIsSfxEnabled] = useState(persistedSession?.isSfxEnabled ?? persistedSession?.isAudioEnabled ?? true);
   const [chaseCardName, setChaseCardName] = useState(persistedSession?.chaseCardName ?? '');
   const [chaseHitCard, setChaseHitCard] = useState<CardDto | null>(null);
-  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
-  const [cloudSyncStatus, setCloudSyncStatus] = useState<CloudSyncStatus>('idle');
   const persistedSessionPayload = useMemo<PersistedSessionState>(() => ({
     activeView,
     allPulledCards,
@@ -138,6 +134,13 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
     selectedSetCode,
     sessionStats,
   ]);
+  const cloudSync = useAccountSnapshotSync({
+    accountId,
+    applyRemote: applyPersistedSessionState,
+    load: fetchCurrentSavedSession,
+    payload: persistedSessionPayload,
+    save: saveCurrentSavedSession,
+  });
 
   useEffect(() => {
     preloadPackWrapperImages();
@@ -158,100 +161,8 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
   }, [engineRetryKey, engineStatus]);
 
   useEffect(() => {
-    savePersistedSession(persistedSessionPayload);
-  }, [persistedSessionPayload]);
-
-  useEffect(() => {
-    if (!authSession) {
-      setCloudSyncError(null);
-      setCloudSyncStatus('idle');
-      return;
-    }
-
-    let ignore = false;
-    setCloudSyncError(null);
-    setCloudSyncStatus('loading');
-
-    fetchCurrentSavedSession().then((savedSession) => {
-      if (ignore || !savedSession) {
-        if (!ignore) {
-          setCloudSyncStatus('idle');
-        }
-        return;
-      }
-
-      remoteSessionIdRef.current = savedSession.id;
-      saveRemoteSessionId(savedSession.id);
-
-      if (isEmptySession(persistedSessionPayload)) {
-        applyPersistedSessionState(savedSession.state);
-      }
-      setCloudSyncStatus('saved');
-    }).catch((caughtError) => {
-      if (!ignore) {
-        setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to load your account save.');
-        setCloudSyncStatus('error');
-      }
-    });
-
-    return () => {
-      ignore = true;
-    };
-  }, [authSession?.user.id]);
-
-  useEffect(() => {
-    if (engineStatus !== 'ready') {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      const remoteSessionId = remoteSessionIdRef.current;
-
-      if (remoteSessionId) {
-        if (authSession) {
-          setCloudSyncError(null);
-          setCloudSyncStatus('syncing');
-        }
-        updateSavedSession(remoteSessionId, persistedSessionPayload).then(() => {
-          if (authSession) {
-            setCloudSyncStatus('saved');
-          }
-        }).catch((caughtError) => {
-          if (authSession) {
-            setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to save your session.');
-            setCloudSyncStatus('error');
-          }
-        });
-        return;
-      }
-
-      if (isCreatingRemoteSessionRef.current) {
-        return;
-      }
-
-      isCreatingRemoteSessionRef.current = true;
-      if (authSession) {
-        setCloudSyncError(null);
-        setCloudSyncStatus('syncing');
-      }
-      createSavedSession(persistedSessionPayload).then((savedSession) => {
-        remoteSessionIdRef.current = savedSession.id;
-        saveRemoteSessionId(savedSession.id);
-        if (authSession) {
-          setCloudSyncStatus('saved');
-        }
-      }).catch((caughtError) => {
-        if (authSession) {
-          setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to create your account save.');
-          setCloudSyncStatus('error');
-        }
-      }).finally(() => {
-        isCreatingRemoteSessionRef.current = false;
-      });
-    }, 1500);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [authSession, engineStatus, persistedSessionPayload]);
+    savePersistedSession(persistedSessionPayload, accountId);
+  }, [accountId, persistedSessionPayload]);
 
   useEffect(() => {
     let ignore = false;
@@ -401,9 +312,7 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
   }
 
   function resetSession() {
-    clearPersistedSession();
-    remoteSessionIdRef.current = null;
-    isCreatingRemoteSessionRef.current = false;
+    clearPersistedSession(accountId);
     resetCurrentPack();
     setSessionStats(initialSessionStats);
     setAllPulledCards([]);
@@ -483,7 +392,7 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
   }
 
   async function handleOpenPack() {
-    if (!isEngineReady) {
+    if (!isEngineReady || !cloudSync.isHydrated) {
       return;
     }
 
@@ -843,7 +752,7 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
                   </button>
                   <button
                     className="rounded-md bg-ember px-5 py-3 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 transition hover:-translate-y-0.5 hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-                    disabled={!isEngineReady || isLoading || isOpeningWrapper || isRevealLocked}
+                    disabled={!isEngineReady || !cloudSync.isHydrated || isLoading || isOpeningWrapper || isRevealLocked}
                     onClick={handleOpenPack}
                     type="button"
                   >
@@ -852,7 +761,7 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
                       : isRevealLocked
                         ? 'Finish Reveal First'
                         : isEngineReady
-                          ? 'Open Pack'
+                          ? (cloudSync.isHydrated ? 'Open Pack' : 'Loading Account')
                           : 'Engine Waking'}
                   </button>
                 </div>
@@ -861,8 +770,8 @@ export function PackOpener({ appStep, authSession, setAppStep }: PackOpenerProps
               {authSession && (
                 <CloudSyncBadge
                   displayName={authSession.user.displayName}
-                  error={cloudSyncError}
-                  status={cloudSyncStatus}
+                  error={cloudSync.error}
+                  status={cloudSync.status}
                 />
               )}
 
@@ -1161,7 +1070,7 @@ function CloudSyncBadge({
 }: {
   displayName: string;
   error: string | null;
-  status: CloudSyncStatus;
+  status: SnapshotSyncStatus;
 }) {
   const statusConfig = {
     error: {
@@ -1184,7 +1093,7 @@ function CloudSyncBadge({
       className: 'border-ember/35 bg-ember/10 text-amber-100',
       label: 'Saving to account...',
     },
-  } satisfies Record<CloudSyncStatus, { className: string; label: string }>;
+  } satisfies Record<SnapshotSyncStatus, { className: string; label: string }>;
   const config = statusConfig[status];
 
   return (
@@ -1353,10 +1262,4 @@ function updateBinderCards(currentCards: CardDto[], pack: OpenedPackDto): CardDt
   return Array.from(cardsById.values())
     .sort((left, right) => right.priceUsd - left.priceUsd)
     .slice(0, 20);
-}
-
-function isEmptySession(session: PersistedSessionState): boolean {
-  return session.sessionStats.packsOpened === 0
-    && session.allPulledCards.length === 0
-    && session.packHistory.length === 0;
 }

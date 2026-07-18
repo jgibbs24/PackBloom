@@ -10,8 +10,9 @@ test('registers, shows profile, syncs account save, and signs out', async ({ pag
     token: 'token-e2e',
     user,
   };
-  let savedSessionId = 'session-e2e';
+  const savedSessionId = 'session-e2e';
   let savedSessionState: unknown = null;
+  let savedSessionRevision = -1;
 
   await page.route('**://*/api/**', async (route) => {
     const request = route.request();
@@ -50,25 +51,26 @@ test('registers, shows profile, syncs account save, and signs out', async ({ pag
       return;
     }
 
-    if (path === '/api/sessions/current') {
+    if (path === '/api/sessions/current' && request.method() === 'GET') {
       await route.fulfill({ status: 404, json: { code: 'SAVED_SESSION_NOT_FOUND' } });
       return;
     }
 
-    if (path === '/api/battle-sessions/current') {
+    if (path === '/api/battle-sessions/current' && request.method() === 'GET') {
       await route.fulfill({ status: 404, json: { code: 'SAVED_BATTLE_SESSION_NOT_FOUND' } });
       return;
     }
 
-    if (path === '/api/sessions' && request.method() === 'POST') {
-      const body = JSON.parse(request.postData() ?? '{}') as { state?: unknown };
+    if (path === '/api/sessions/current' && request.method() === 'PUT') {
+      const body = JSON.parse(request.postData() ?? '{}') as { expectedRevision?: number | null; state?: unknown };
       savedSessionState = body.state;
+      savedSessionRevision += 1;
       await route.fulfill({
-        status: 201,
         json: {
           createdAt: new Date().toISOString(),
           displayName: 'PackBloom Session',
           id: savedSessionId,
+          revision: savedSessionRevision,
           state: savedSessionState,
           updatedAt: new Date().toISOString(),
         },
@@ -76,15 +78,14 @@ test('registers, shows profile, syncs account save, and signs out', async ({ pag
       return;
     }
 
-    if (path === `/api/sessions/${savedSessionId}` && request.method() === 'PUT') {
-      const body = JSON.parse(request.postData() ?? '{}') as { state?: unknown };
-      savedSessionState = body.state;
+    if (path === '/api/battle-sessions/current' && request.method() === 'PUT') {
       await route.fulfill({
         json: {
           createdAt: new Date().toISOString(),
-          displayName: 'PackBloom Session',
-          id: savedSessionId,
-          state: savedSessionState,
+          displayName: 'PackBloom Battle Session',
+          id: 'battle-session-e2e',
+          revision: 0,
+          state: JSON.parse(request.postData() ?? '{}').state,
           updatedAt: new Date().toISOString(),
         },
       });

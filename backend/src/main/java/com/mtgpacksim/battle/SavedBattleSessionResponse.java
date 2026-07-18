@@ -9,6 +9,7 @@ public record SavedBattleSessionResponse(
         UUID id,
         String displayName,
         JsonNode state,
+        long revision,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {

@@ -3,8 +3,10 @@ package com.mtgpacksim.config;
 import com.mtgpacksim.pack.PackOpeningException;
 import com.mtgpacksim.auth.AuthException;
 import com.mtgpacksim.battle.SavedBattleSessionException;
+import com.mtgpacksim.battle.SavedBattleSessionConflictException;
 import com.mtgpacksim.scryfall.ScryfallException;
 import com.mtgpacksim.session.SavedSessionException;
+import com.mtgpacksim.session.SavedSessionConflictException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -65,6 +67,13 @@ public class ApiExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(SavedSessionConflictException.class)
+    ResponseEntity<ApiErrorResponse> handleSavedSessionConflict(SavedSessionConflictException exception) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse("SAVED_SESSION_CONFLICT", exception.getMessage()));
+    }
+
     @ExceptionHandler(AuthException.class)
     ResponseEntity<ApiErrorResponse> handleAuthError(AuthException exception) {
         HttpStatus status = "Sign in to access this resource.".equals(exception.getMessage())
@@ -92,6 +101,15 @@ public class ApiExceptionHandler {
                         status == HttpStatus.NOT_FOUND ? "SAVED_BATTLE_SESSION_NOT_FOUND" : "SAVED_BATTLE_SESSION_INVALID",
                         exception.getMessage()
                 ));
+    }
+
+    @ExceptionHandler(SavedBattleSessionConflictException.class)
+    ResponseEntity<ApiErrorResponse> handleSavedBattleSessionConflict(
+            SavedBattleSessionConflictException exception
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse("SAVED_BATTLE_SESSION_CONFLICT", exception.getMessage()));
     }
 
     record ApiErrorResponse(String code, String message) {

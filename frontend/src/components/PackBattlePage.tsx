@@ -1,17 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AuthSession } from '../api/authApi';
-import {
-  createSavedBattleSession,
-  deleteSavedBattleSession,
-  fetchCurrentSavedBattleSession,
-  updateSavedBattleSession,
-} from '../api/battleSessionApi';
+import { fetchCurrentSavedBattleSession, saveCurrentSavedBattleSession } from '../api/battleSessionApi';
 import { openPack } from '../api/packApi';
 import type { WarmupStatusDto } from '../api/packApi';
 import { playFeedbackSound } from '../audioFeedback';
 import { formatCardPrice } from '../cardPrice';
 import { getBoosterOption, type BoosterType } from '../packLabels';
 import type { CardDto, OpenedPackDto, SupportedSetDto } from '../types/pack';
+import { useAccountSnapshotSync } from '../useAccountSnapshotSync';
+import type { SnapshotSyncStatus } from '../useAccountSnapshotSync';
 import { PackWrapper } from './PackWrapper';
 import type { SetTheme } from '../setThemes';
 
@@ -44,7 +41,6 @@ type BattleResult = {
 
 type BattleProgress = 'idle' | 'first' | 'second';
 type BattleRevealMode = 'all' | 'one-by-one';
-type BattleCloudSyncStatus = 'idle' | 'loading' | 'syncing' | 'saved' | 'error';
 
 type BattleSessionStats = {
   battles: number;
@@ -78,8 +74,8 @@ const initialBattleStats: BattleSessionStats = {
   playerBWins: 0,
   ties: 0,
 };
-const BATTLE_SESSION_STORAGE_KEY = 'packbloom-battle-session-v1';
-const REMOTE_BATTLE_SESSION_ID_KEY = 'packbloom-remote-battle-session-id-v1';
+const LEGACY_BATTLE_SESSION_STORAGE_KEY = 'packbloom-battle-session-v1';
+const BATTLE_SESSION_STORAGE_KEY_PREFIX = 'packbloom-battle-session-v2';
 const BATTLE_HISTORY_LIMIT = 30;
 
 export function PackBattlePage({
@@ -99,8 +95,7 @@ export function PackBattlePage({
   theme,
   warmupStatus,
 }: PackBattlePageProps) {
-  const remoteBattleSessionIdRef = useRef<string | null>(loadRemoteBattleSessionId());
-  const isCreatingRemoteBattleSessionRef = useRef(false);
+  const accountId = authSession?.user.id ?? null;
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -110,9 +105,7 @@ export function PackBattlePage({
   const [battleRevealMode, setBattleRevealMode] = useState<BattleRevealMode>('all');
   const [revealedCount, setRevealedCount] = useState(0);
   const [hasCountedBattle, setHasCountedBattle] = useState(false);
-  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
-  const [cloudSyncStatus, setCloudSyncStatus] = useState<BattleCloudSyncStatus>('idle');
-  const persistedBattleSession = useMemo(() => loadPersistedBattleSession(), []);
+  const persistedBattleSession = useMemo(() => loadPersistedBattleSession(accountId), [accountId]);
   const [battleStats, setBattleStats] = useState<BattleSessionStats>(
     persistedBattleSession?.battleStats ?? initialBattleStats,
   );
@@ -123,6 +116,18 @@ export function PackBattlePage({
     battleHistory,
     battleStats,
   }), [battleHistory, battleStats]);
+  const cloudSync = useAccountSnapshotSync({
+    accountId,
+    applyRemote: (state) => {
+      setBattleStats(isBattleSessionStats(state.battleStats) ? state.battleStats : initialBattleStats);
+      setBattleHistory(Array.isArray(state.battleHistory)
+        ? (state.battleHistory as BattleHistoryEntry[]).slice(0, BATTLE_HISTORY_LIMIT)
+        : []);
+    },
+    load: fetchCurrentSavedBattleSession,
+    payload: persistedBattleSessionPayload,
+    save: saveCurrentSavedBattleSession,
+  });
 
   const winner = useMemo(() => {
     if (!battleResult) {
@@ -148,108 +153,15 @@ export function PackBattlePage({
   const isWarmupLoading = Boolean(
     !currentWarmupStatus || currentWarmupStatus.status === 'idle' || currentWarmupStatus.status === 'loading',
   );
-  const canStartBattle = isEngineReady && isWarmupReady && !isLoading && !isOneByOneBattleActive;
+  const canStartBattle = isEngineReady
+    && isWarmupReady
+    && cloudSync.isHydrated
+    && !isLoading
+    && !isOneByOneBattleActive;
 
   useEffect(() => {
-    savePersistedBattleSession(persistedBattleSessionPayload);
-  }, [persistedBattleSessionPayload]);
-
-  useEffect(() => {
-    if (!authSession) {
-      setCloudSyncError(null);
-      setCloudSyncStatus('idle');
-      return;
-    }
-
-    let ignore = false;
-    setCloudSyncError(null);
-    setCloudSyncStatus('loading');
-
-    fetchCurrentSavedBattleSession().then((savedSession) => {
-      if (ignore || !savedSession) {
-        if (!ignore) {
-          setCloudSyncStatus('idle');
-        }
-        return;
-      }
-
-      remoteBattleSessionIdRef.current = savedSession.id;
-      saveRemoteBattleSessionId(savedSession.id);
-
-      if (isEmptyBattleSession(persistedBattleSessionPayload)) {
-        setBattleStats(isBattleSessionStats(savedSession.state.battleStats)
-          ? savedSession.state.battleStats
-          : initialBattleStats);
-        setBattleHistory(Array.isArray(savedSession.state.battleHistory)
-          ? (savedSession.state.battleHistory as BattleHistoryEntry[]).slice(0, BATTLE_HISTORY_LIMIT)
-          : []);
-      }
-      setCloudSyncStatus('saved');
-    }).catch((caughtError) => {
-      if (!ignore) {
-        setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to load your battle save.');
-        setCloudSyncStatus('error');
-      }
-    });
-
-    return () => {
-      ignore = true;
-    };
-  }, [authSession?.user.id]);
-
-  useEffect(() => {
-    if (!isEngineReady) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      const remoteBattleSessionId = remoteBattleSessionIdRef.current;
-
-      if (remoteBattleSessionId) {
-        if (authSession) {
-          setCloudSyncError(null);
-          setCloudSyncStatus('syncing');
-        }
-        updateSavedBattleSession(remoteBattleSessionId, persistedBattleSessionPayload).then(() => {
-          if (authSession) {
-            setCloudSyncStatus('saved');
-          }
-        }).catch((caughtError) => {
-          if (authSession) {
-            setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to save your battle session.');
-            setCloudSyncStatus('error');
-          }
-        });
-        return;
-      }
-
-      if (isCreatingRemoteBattleSessionRef.current) {
-        return;
-      }
-
-      isCreatingRemoteBattleSessionRef.current = true;
-      if (authSession) {
-        setCloudSyncError(null);
-        setCloudSyncStatus('syncing');
-      }
-      createSavedBattleSession(persistedBattleSessionPayload).then((savedSession) => {
-        remoteBattleSessionIdRef.current = savedSession.id;
-        saveRemoteBattleSessionId(savedSession.id);
-        if (authSession) {
-          setCloudSyncStatus('saved');
-        }
-      }).catch((caughtError) => {
-        if (authSession) {
-          setCloudSyncError(caughtError instanceof Error ? caughtError.message : 'Unable to create your battle save.');
-          setCloudSyncStatus('error');
-        }
-      }).finally(() => {
-        isCreatingRemoteBattleSessionRef.current = false;
-      });
-    }, 1500);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [authSession, isEngineReady, persistedBattleSessionPayload]);
+    savePersistedBattleSession(persistedBattleSessionPayload, accountId);
+  }, [accountId, persistedBattleSessionPayload]);
 
   async function handleStartBattle() {
     if (!canStartBattle || !selectedSet) {
@@ -457,8 +369,8 @@ export function PackBattlePage({
             {authSession && (
               <BattleCloudSyncBadge
                 displayName={authSession.user.displayName}
-                error={cloudSyncError}
-                status={cloudSyncStatus}
+                error={cloudSync.error}
+                status={cloudSync.status}
               />
             )}
             {isLoading && (
@@ -525,16 +437,9 @@ export function PackBattlePage({
           playerBName={normalizePlayerName(playerBName, 'Player 2')}
           stats={battleStats}
           onResetStats={() => {
-            const remoteBattleSessionId = remoteBattleSessionIdRef.current;
-            if (remoteBattleSessionId) {
-              deleteSavedBattleSession(remoteBattleSessionId).catch(() => undefined);
-            }
-            remoteBattleSessionIdRef.current = null;
-            isCreatingRemoteBattleSessionRef.current = false;
             setBattleStats(initialBattleStats);
             setBattleHistory([]);
-            clearPersistedBattleSession();
-            clearRemoteBattleSessionId();
+            clearPersistedBattleSession(accountId);
           }}
         />
 
@@ -916,7 +821,7 @@ function BattleCloudSyncBadge({
 }: {
   displayName: string;
   error: string | null;
-  status: BattleCloudSyncStatus;
+  status: SnapshotSyncStatus;
 }) {
   const statusConfig = {
     error: {
@@ -939,7 +844,7 @@ function BattleCloudSyncBadge({
       className: 'border-ember/35 bg-ember/10 text-amber-100',
       label: 'Saving battle to account...',
     },
-  } satisfies Record<BattleCloudSyncStatus, { className: string; label: string }>;
+  } satisfies Record<SnapshotSyncStatus, { className: string; label: string }>;
   const config = statusConfig[status];
 
   return (
@@ -1013,7 +918,7 @@ function createBattleHistoryEntry(
   };
 }
 
-function loadPersistedBattleSession(): {
+function loadPersistedBattleSession(userId: string | null): {
   battleHistory: BattleHistoryEntry[];
   battleStats: BattleSessionStats;
 } | null {
@@ -1022,7 +927,8 @@ function loadPersistedBattleSession(): {
   }
 
   try {
-    const rawSession = window.localStorage.getItem(BATTLE_SESSION_STORAGE_KEY);
+    const rawSession = window.localStorage.getItem(battleSessionStorageKey(userId))
+      ?? (userId === null ? window.localStorage.getItem(LEGACY_BATTLE_SESSION_STORAGE_KEY) : null);
     if (!rawSession) {
       return null;
     }
@@ -1048,47 +954,30 @@ function loadPersistedBattleSession(): {
 function savePersistedBattleSession(session: {
   battleHistory: BattleHistoryEntry[];
   battleStats: BattleSessionStats;
-}) {
+}, userId: string | null) {
   if (typeof window === 'undefined') {
     return;
   }
 
-  window.localStorage.setItem(BATTLE_SESSION_STORAGE_KEY, JSON.stringify({
+  window.localStorage.setItem(battleSessionStorageKey(userId), JSON.stringify({
     battleHistory: session.battleHistory.slice(0, BATTLE_HISTORY_LIMIT),
     battleStats: session.battleStats,
   }));
 }
 
-function clearPersistedBattleSession() {
+function clearPersistedBattleSession(userId: string | null) {
   if (typeof window === 'undefined') {
     return;
   }
 
-  window.localStorage.removeItem(BATTLE_SESSION_STORAGE_KEY);
+  window.localStorage.removeItem(battleSessionStorageKey(userId));
+  if (userId === null) {
+    window.localStorage.removeItem(LEGACY_BATTLE_SESSION_STORAGE_KEY);
+  }
 }
 
-function loadRemoteBattleSessionId(): string | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return window.localStorage.getItem(REMOTE_BATTLE_SESSION_ID_KEY);
-}
-
-function saveRemoteBattleSessionId(id: string) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(REMOTE_BATTLE_SESSION_ID_KEY, id);
-}
-
-function clearRemoteBattleSessionId() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.removeItem(REMOTE_BATTLE_SESSION_ID_KEY);
+function battleSessionStorageKey(userId: string | null): string {
+  return `${BATTLE_SESSION_STORAGE_KEY_PREFIX}:${userId === null ? 'anonymous' : `user:${userId}`}`;
 }
 
 function isBattleSessionStats(stats: unknown): stats is BattleSessionStats {
@@ -1112,11 +1001,4 @@ function findBestCard(cards: CardDto[]): CardDto | null {
     }
     return best;
   }, null);
-}
-
-function isEmptyBattleSession(session: {
-  battleHistory: unknown[];
-  battleStats: BattleSessionStats;
-}): boolean {
-  return session.battleHistory.length === 0 && session.battleStats.battles === 0;
 }

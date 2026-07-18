@@ -12,25 +12,20 @@ export type SavedBattleSessionResponse = {
   createdAt: string;
   displayName: string;
   id: string;
+  revision: number;
   state: SavedBattleSessionState;
   updatedAt: string;
 };
 
-export async function createSavedBattleSession(
+export async function saveCurrentSavedBattleSession(
   state: SavedBattleSessionState,
+  expectedRevision: number | null,
 ): Promise<SavedBattleSessionResponse> {
-  return sendSavedBattleSessionRequest(apiUrl('/api/battle-sessions'), 'POST', state);
+  return sendSavedBattleSessionRequest(apiUrl('/api/battle-sessions/current'), state, expectedRevision);
 }
 
-export async function updateSavedBattleSession(
-  id: string,
-  state: SavedBattleSessionState,
-): Promise<SavedBattleSessionResponse> {
-  return sendSavedBattleSessionRequest(apiUrl(`/api/battle-sessions/${id}`), 'PUT', state);
-}
-
-export async function deleteSavedBattleSession(id: string): Promise<void> {
-  const response = await fetchWithTimeout(apiUrl(`/api/battle-sessions/${id}`), DEFAULT_REQUEST_TIMEOUT_MS, {
+export async function deleteCurrentSavedBattleSession(): Promise<void> {
+  const response = await fetchWithTimeout(apiUrl('/api/battle-sessions/current'), DEFAULT_REQUEST_TIMEOUT_MS, {
     headers: authHeaders(),
     method: 'DELETE',
   });
@@ -48,7 +43,7 @@ export async function fetchCurrentSavedBattleSession(): Promise<SavedBattleSessi
     },
   });
 
-  if (response.status === 404 || response.status === 401) {
+  if (response.status === 404) {
     return null;
   }
 
@@ -61,12 +56,13 @@ export async function fetchCurrentSavedBattleSession(): Promise<SavedBattleSessi
 
 async function sendSavedBattleSessionRequest(
   url: string,
-  method: 'POST' | 'PUT',
   state: SavedBattleSessionState,
+  expectedRevision: number | null,
 ): Promise<SavedBattleSessionResponse> {
   const response = await fetchWithTimeout(url, DEFAULT_REQUEST_TIMEOUT_MS, {
     body: JSON.stringify({
       displayName: 'PackBloom Battle Session',
+      expectedRevision,
       state,
     }),
     headers: {
@@ -74,7 +70,7 @@ async function sendSavedBattleSessionRequest(
       'Content-Type': 'application/json',
       ...authHeaders(),
     },
-    method,
+    method: 'PUT',
   });
 
   if (!response.ok) {

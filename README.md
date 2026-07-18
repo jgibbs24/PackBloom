@@ -401,43 +401,59 @@ Deletes the current bearer token server-side.
 
 ### `POST /api/sessions`
 
-Creates a saved session snapshot. If a bearer token is provided, the snapshot is attached to that user account.
+Creates the signed-in user's saved session snapshot. A bearer token is required, and each account has at most one opener snapshot.
 
 ### `GET /api/sessions/current`
 
-Returns the latest saved opener session for the signed-in user.
+Returns the canonical saved opener session for the signed-in user.
+
+### `PUT /api/sessions/current`
+
+Creates or revision-checks and updates the signed-in user's canonical opener snapshot. Updates must provide the last observed `expectedRevision`; stale writes return `409 Conflict`.
+
+### `DELETE /api/sessions/current`
+
+Deletes the signed-in user's canonical opener snapshot.
 
 ### `GET /api/sessions/{id}`
 
-Fetches a saved session snapshot.
+Fetches an owned saved session snapshot. A bearer token is required.
 
 ### `PUT /api/sessions/{id}`
 
-Updates a saved session snapshot.
+Revision-checks and updates an owned saved session snapshot. A bearer token is required.
 
 ### `DELETE /api/sessions/{id}`
 
-Deletes a saved session snapshot.
+Deletes an owned saved session snapshot. A bearer token is required.
 
 ### `POST /api/battle-sessions`
 
-Creates a saved Pack Battle snapshot. If a bearer token is provided, the snapshot is attached to that user account.
+Creates the signed-in user's Pack Battle snapshot. A bearer token is required, and each account has at most one battle snapshot.
 
 ### `GET /api/battle-sessions/current`
 
-Returns the latest saved Pack Battle snapshot for the signed-in user.
+Returns the canonical saved Pack Battle snapshot for the signed-in user.
+
+### `PUT /api/battle-sessions/current`
+
+Creates or revision-checks and updates the signed-in user's canonical Pack Battle snapshot. Updates must provide the last observed `expectedRevision`; stale writes return `409 Conflict`.
+
+### `DELETE /api/battle-sessions/current`
+
+Deletes the signed-in user's canonical Pack Battle snapshot.
 
 ### `GET /api/battle-sessions/{id}`
 
-Fetches a saved Pack Battle snapshot.
+Fetches an owned saved Pack Battle snapshot. A bearer token is required.
 
 ### `PUT /api/battle-sessions/{id}`
 
-Updates a saved Pack Battle snapshot.
+Revision-checks and updates an owned saved Pack Battle snapshot. A bearer token is required.
 
 ### `DELETE /api/battle-sessions/{id}`
 
-Deletes a saved Pack Battle snapshot.
+Deletes an owned saved Pack Battle snapshot. A bearer token is required.
 
 ## Backend Design Notes
 
@@ -447,8 +463,8 @@ Deletes a saved Pack Battle snapshot.
 - `PackDefinition` describes supported set, booster type, MSRP, and slots.
 - `PackSlot` describes slots like commons, uncommons, rare/mythic, land, collector rare/mythic, and special treatment fallback slots.
 - `ScryfallClient` handles Scryfall HTTP calls and maps responses into app-level `CardDto` objects.
-- `SavedSessionController` and `SavedSessionService` store browser-linked session snapshots in the database.
-- `SavedBattleSessionController` and `SavedBattleSessionService` store browser-linked Pack Battle snapshots in the database.
+- `SavedSessionController` and `SavedSessionService` store one authenticated, revisioned opener snapshot per account.
+- `SavedBattleSessionController` and `SavedBattleSessionService` store one authenticated, revisioned Pack Battle snapshot per account.
 - `AuthController` and `AuthService` provide account registration, login, logout, and bearer-token lookup.
 - Passwords are stored as BCrypt hashes; raw auth tokens are returned once and stored server-side only as SHA-256 hashes.
 - Flyway owns schema creation, including saved snapshots, user accounts, auth tokens, nullable user ownership columns, and schema-first normalized user-data tables.

@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -24,6 +25,10 @@ public class SavedBattleSessionEntity {
 
     @Column(name = "user_id")
     private UUID userId;
+
+    @Version
+    @Column(name = "revision", nullable = false)
+    private long revision;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -78,6 +83,10 @@ public class SavedBattleSessionEntity {
 
     public void setUserId(UUID userId) {
         this.userId = userId;
+    }
+
+    public long getRevision() {
+        return revision;
     }
 
     public OffsetDateTime getCreatedAt() {
