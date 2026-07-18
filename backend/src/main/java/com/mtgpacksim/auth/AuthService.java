@@ -87,8 +87,12 @@ public class AuthService {
     }
 
     public AuthenticatedUser requireUser(String authorizationHeader) {
+        if (authorizationHeader == null || authorizationHeader.isBlank()) {
+            throw AuthTokenException.required();
+        }
+
         return authenticate(authorizationHeader)
-                .orElseThrow(() -> new AuthException("Sign in to access this resource."));
+                .orElseThrow(AuthTokenException::invalid);
     }
 
     private AuthResponse createAuthResponse(UserAccountEntity user) {
@@ -110,11 +114,14 @@ public class AuthService {
 
         String prefix = "Bearer ";
         if (!authorizationHeader.startsWith(prefix)) {
-            throw new AuthException("Invalid authorization header.");
+            throw AuthTokenException.invalid();
         }
 
         String token = authorizationHeader.substring(prefix.length()).trim();
-        return token.isBlank() ? Optional.empty() : Optional.of(token);
+        if (token.isBlank()) {
+            throw AuthTokenException.invalid();
+        }
+        return Optional.of(token);
     }
 
     private String generateToken() {

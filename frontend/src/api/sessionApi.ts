@@ -1,5 +1,5 @@
 import type { PersistedSessionState } from '../sessionStorage';
-import { authHeaders } from './authApi';
+import { authHeaders, throwIfUnauthorized } from './authApi';
 import { apiUrl } from './apiUrl';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
@@ -27,6 +27,7 @@ export async function fetchCurrentSavedSession(): Promise<SavedSessionResponse |
       ...authHeaders(),
     },
   });
+  await throwIfUnauthorized(response);
 
   if (response.status === 404) {
     return null;
@@ -57,6 +58,7 @@ async function sendSavedSessionRequest(
     },
     method: 'PUT',
   });
+  await throwIfUnauthorized(response);
 
   if (!response.ok) {
     throw new Error(await readApiError(response) ?? `Saved session request failed with status ${response.status}`);

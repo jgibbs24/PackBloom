@@ -222,12 +222,13 @@ Example:
 VITE_API_BASE_URL=https://your-backend.example.com
 ```
 
-The backend uses an in-memory H2 database by default so local development works without installing PostgreSQL. To use PostgreSQL, provide:
+The default `local` profile uses an in-memory H2 database so local development works without installing PostgreSQL. Production uses the explicit `prod` profile and refuses to start without PostgreSQL. To run against PostgreSQL, provide:
 
 ```text
 SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/database
 SPRING_DATASOURCE_USERNAME=your_username
 SPRING_DATASOURCE_PASSWORD=your_password
+SPRING_PROFILES_ACTIVE=prod
 ```
 
 On Render, the Docker startup script also accepts Render's native `DATABASE_URL` value and converts it to the JDBC format Spring Boot expects.
@@ -311,7 +312,11 @@ npm run e2e
 
 ### `GET /api/health`
 
-Returns a simple backend health response.
+Returns a dependency-free liveness response.
+
+### `GET /api/health/ready`
+
+Returns `200` only when the backend can obtain a valid database connection; otherwise returns `503`. Render uses this endpoint as its health check.
 
 ### `GET /api/sets`
 
@@ -548,9 +553,10 @@ Environment variable:
 ```text
 APP_CORS_ALLOWED_ORIGINS=https://packbloom.vercel.app
 DATABASE_URL=postgresql://user:password@host:5432/database
+SPRING_PROFILES_ACTIVE=prod
 ```
 
-If configuring the backend manually instead of through the blueprint, create a Render Postgres instance and either copy its internal database URL into `DATABASE_URL` or set Spring's three datasource variables directly. The Docker startup script converts `DATABASE_URL` into `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` before Spring Boot starts. If you prefer setting Spring's URL directly, use the JDBC form: `jdbc:postgresql://host:5432/database`.
+If configuring the backend manually instead of through the blueprint, create a Render Postgres instance and either copy its internal database URL into `DATABASE_URL` or set Spring's three datasource variables directly. The Docker startup script converts `DATABASE_URL` into `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` before Spring Boot starts. If you prefer setting Spring's URL directly, use the JDBC form: `jdbc:postgresql://host:5432/database`. The production entrypoint exits before launching Java when any required datasource value is missing.
 
 Render free web services can cold start after inactivity. PackBloom shows user-facing engine wake/warmup messaging for this.
 

@@ -1,10 +1,10 @@
 import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  clearAuthSession,
-  loadAuthSession,
   logoutAuthSession,
+  subscribeToAuthSessionChanges,
   submitAuthRequest,
+  validateStoredAuthSession,
   type AuthMode,
   type AuthSession,
 } from './api/authApi';
@@ -12,10 +12,35 @@ import { PackOpener } from './components/PackOpener';
 import type { AppStep } from './components/PackOpener';
 
 export default function App() {
-  const [authSession, setAuthSession] = useState<AuthSession | null>(() => loadAuthSession());
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
   const [isAuthPanelOpen, setIsAuthPanelOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [appStep, setAppStep] = useState<AppStep>('start');
+
+  useEffect(() => {
+    let ignore = false;
+    const applySession = (session: AuthSession | null) => {
+      if (ignore) return;
+      setAuthSession(session);
+      if (!session) {
+        setIsProfileOpen(false);
+      }
+    };
+    const unsubscribe = subscribeToAuthSessionChanges(applySession);
+
+    validateStoredAuthSession()
+      .then(applySession)
+      .catch(() => applySession(null))
+      .finally(() => {
+        if (!ignore) setIsAuthResolved(true);
+      });
+
+    return () => {
+      ignore = true;
+      unsubscribe();
+    };
+  }, []);
 
   return (
     <main className="min-h-screen overflow-hidden bg-ink text-stone-100">
@@ -57,7 +82,11 @@ export default function App() {
               </a>
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              {authSession ? (
+              {!isAuthResolved ? (
+                <span className="px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-stone-500">
+                  Checking account...
+                </span>
+              ) : authSession ? (
                 <button
                   className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-stone-200 transition hover:border-ember hover:text-ember"
                   onClick={() => setIsProfileOpen(true)}
@@ -78,14 +107,16 @@ export default function App() {
           </div>
         </header>
 
-      <PackOpener
-        key={authSession?.user.id ?? 'anonymous'}
-        appStep={appStep}
-        authSession={authSession}
-        setAppStep={setAppStep}
-      />
+        {isAuthResolved && (
+          <PackOpener
+            key={authSession?.user.id ?? 'anonymous'}
+            appStep={appStep}
+            authSession={authSession}
+            setAppStep={setAppStep}
+          />
+        )}
       </section>
-      {isAuthPanelOpen && (
+      {isAuthResolved && isAuthPanelOpen && (
         <AuthPanel
           onClose={() => setIsAuthPanelOpen(false)}
           onSignedIn={(session) => {
@@ -100,7 +131,6 @@ export default function App() {
           onClose={() => setIsProfileOpen(false)}
           onSignOut={() => {
             logoutAuthSession().finally(() => {
-              clearAuthSession();
               setAuthSession(null);
               setIsProfileOpen(false);
             });

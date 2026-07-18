@@ -2,6 +2,7 @@ package com.mtgpacksim.config;
 
 import com.mtgpacksim.pack.PackOpeningException;
 import com.mtgpacksim.auth.AuthException;
+import com.mtgpacksim.auth.AuthTokenException;
 import com.mtgpacksim.battle.SavedBattleSessionException;
 import com.mtgpacksim.battle.SavedBattleSessionConflictException;
 import com.mtgpacksim.scryfall.ScryfallException;
@@ -74,19 +75,18 @@ public class ApiExceptionHandler {
                 .body(new ApiErrorResponse("SAVED_SESSION_CONFLICT", exception.getMessage()));
     }
 
+    @ExceptionHandler(AuthTokenException.class)
+    ResponseEntity<ApiErrorResponse> handleAuthTokenError(AuthTokenException exception) {
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(new ApiErrorResponse(exception.getCode(), exception.getMessage()));
+    }
+
     @ExceptionHandler(AuthException.class)
     ResponseEntity<ApiErrorResponse> handleAuthError(AuthException exception) {
-        HttpStatus status = "Sign in to access this resource.".equals(exception.getMessage())
-                || "Invalid authorization header.".equals(exception.getMessage())
-                ? HttpStatus.UNAUTHORIZED
-                : HttpStatus.BAD_REQUEST;
-
         return ResponseEntity
-                .status(status)
-                .body(new ApiErrorResponse(
-                        status == HttpStatus.UNAUTHORIZED ? "AUTH_REQUIRED" : "AUTH_INVALID",
-                        exception.getMessage()
-                ));
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ApiErrorResponse("AUTH_INVALID", exception.getMessage()));
     }
 
     @ExceptionHandler(SavedBattleSessionException.class)

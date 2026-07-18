@@ -7,6 +7,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.util.UUID;
 
@@ -18,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class SavedSessionControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -40,6 +42,11 @@ class SavedSessionControllerTest {
 
         mockMvc.perform(get("/api/sessions/{id}", UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/sessions/current")
+                        .header("Authorization", "Bearer unknown-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID"));
     }
 
     @Test

@@ -1,6 +1,7 @@
 import { apiUrl } from './apiUrl';
 
 const AUTH_STORAGE_KEY = 'packbloom-auth-v1';
+const AUTH_CHANGE_EVENT = 'packbloom:auth-change';
 const DEFAULT_REQUEST_TIMEOUT_MS = 12000;
 
 export type AuthenticatedUser = {
@@ -15,6 +16,13 @@ export type AuthSession = {
 };
 
 export type AuthMode = 'login' | 'register';
+
+export class AuthSessionExpiredError extends Error {
+  constructor(message = 'Your sign-in has expired. Please sign in again.') {
+    super(message);
+    this.name = 'AuthSessionExpiredError';
+  }
+}
 
 export function loadAuthSession(): AuthSession | null {
   if (typeof window === 'undefined') {
@@ -44,15 +52,79 @@ export function getAuthToken(): string | null {
 
 export function saveAuthSession(session: AuthSession) {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  notifyAuthChange();
 }
 
 export function clearAuthSession() {
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  notifyAuthChange();
 }
 
 export function authHeaders(): HeadersInit {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export function subscribeToAuthSessionChanges(listener: (session: AuthSession | null) => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => undefined;
+  }
+
+  const handleAuthChange = () => listener(loadAuthSession());
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === AUTH_STORAGE_KEY) {
+      handleAuthChange();
+    }
+  };
+  window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+  window.addEventListener('storage', handleStorage);
+
+  return () => {
+    window.removeEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+    window.removeEventListener('storage', handleStorage);
+  };
+}
+
+export async function validateStoredAuthSession(): Promise<AuthSession | null> {
+  const session = loadAuthSession();
+  if (!session) {
+    return null;
+  }
+
+  const response = await fetchWithTimeout(apiUrl('/api/auth/me'), DEFAULT_REQUEST_TIMEOUT_MS, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${session.token}`,
+    },
+  });
+
+  if (response.status === 401) {
+    clearAuthSession();
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(await readApiError(response) ?? `Session validation failed with status ${response.status}`);
+  }
+
+  const user = await response.json() as AuthenticatedUser;
+  if (!user.id || !user.email || !user.displayName) {
+    clearAuthSession();
+    return null;
+  }
+
+  const validatedSession = { token: session.token, user };
+  saveAuthSession(validatedSession);
+  return validatedSession;
+}
+
+export async function throwIfUnauthorized(response: Response): Promise<void> {
+  if (response.status !== 401) {
+    return;
+  }
+
+  const message = await readApiError(response);
+  clearAuthSession();
+  throw new AuthSessionExpiredError(message ?? undefined);
 }
 
 export async function submitAuthRequest({
@@ -119,12 +191,18 @@ function fetchWithTimeout(
   init: RequestInit = {},
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
 
   return fetch(input, {
     ...init,
     signal: controller.signal,
   }).finally(() => {
-    window.clearTimeout(timeoutId);
+    globalThis.clearTimeout(timeoutId);
   });
+}
+
+function notifyAuthChange() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
+  }
 }

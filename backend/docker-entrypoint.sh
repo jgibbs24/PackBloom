@@ -21,4 +21,13 @@ if [ -z "${SPRING_DATASOURCE_URL:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
   export SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD:-$database_password}"
 fi
 
+case ",${SPRING_PROFILES_ACTIVE:-}," in
+  *,prod,*)
+    if [ -z "${SPRING_DATASOURCE_URL:-}" ] || [ -z "${SPRING_DATASOURCE_USERNAME:-}" ] || [ -z "${SPRING_DATASOURCE_PASSWORD:-}" ]; then
+      echo "Production startup requires PostgreSQL datasource URL, username, and password." >&2
+      exit 1
+    fi
+    ;;
+esac
+
 exec java -jar app.jar

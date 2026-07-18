@@ -8,6 +8,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,14 +16,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.OffsetDateTime;
+import java.util.HexFormat;
+import java.util.UUID;
+
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class AuthControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private AuthTokenRepository authTokenRepository;
 
     @Test
     void registersLogsInAndFetchesCurrentUser() throws Exception {
@@ -103,5 +114,47 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.displayName").value("Cloud Session"))
                 .andExpect(jsonPath("$.state.selectedSetCode").value("otj"))
                 .andExpect(jsonPath("$.state.sessionStats.packsOpened").value(4));
+    }
+
+    @Test
+    void distinguishesMissingInvalidAndExpiredCredentials() throws Exception {
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_REQUIRED"));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer unknown-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID"));
+
+        String authResponse = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Expired User",
+                                  "email": "expired-user@test.dev",
+                                  "password": "password123"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID userId = UUID.fromString(objectMapper.readTree(authResponse).at("/user/id").asText());
+        String expiredToken = "expired-token";
+        authTokenRepository.save(new AuthTokenEntity(
+                UUID.randomUUID(),
+                userId,
+                sha256(expiredToken),
+                OffsetDateTime.now().minusMinutes(1)
+        ));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + expiredToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID"));
+    }
+
+    private String sha256(String value) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(value.getBytes(StandardCharsets.UTF_8)));
     }
 }
